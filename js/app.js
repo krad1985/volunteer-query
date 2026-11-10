@@ -164,8 +164,8 @@ function printRoster() {
   const actName = currentActivity?.name || '名冊';
   const now = new Date().toLocaleString('zh-TW', { hour12: false });
   const thead = '<thead><tr>' + fields.map(f => `<th>${escHtml(f)}</th>`).join('') + '</tr></thead>';
-  const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => {
-    const h = fields[r.indexOf(c)] || '';
+  const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map((c, i) => {
+    const h = fields[i] || '';
     let val = c;
     if (h && (h.includes('義工')||h.includes('早餐')||h.includes('午餐')||h.includes('晚餐')||h.includes('住宿'))) {
       val = String(c)==='1' ? '☑' : (String(c)==='0' ? '☐' : '');
