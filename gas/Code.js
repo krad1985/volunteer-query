@@ -90,6 +90,21 @@ function handleGetActivityInfo(params) {
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
   const data = readSpreadsheetData(activity);
   if (!data.ok) return data;
+  const gf = activity.groupField;
+  const sf = activity.subgroupField;
+  // 依大組分組的小組清單
+  const subgroupsByGroup = {};
+  data.rawRows.forEach(r => {
+    const g = String(r[gf] ?? '').trim() || '（未分組）';
+    const s = String(r[sf] ?? '').trim() || '（未分小組）';
+    if (!subgroupsByGroup[g]) subgroupsByGroup[g] = {};
+    subgroupsByGroup[g][s] = true;
+  });
+  const subgroupsByGroupArr = {};
+  Object.keys(subgroupsByGroup).forEach(g => {
+    subgroupsByGroupArr[g] = Object.keys(subgroupsByGroup[g]).sort((a,b)=>a.localeCompare(b,'zh-TW'));
+  });
+  const displayFields = (activity.displayFields && activity.displayFields.length) ? activity.displayFields : data.headers;
   return {
     ok: true,
     activity: {
@@ -109,7 +124,9 @@ function handleGetActivityInfo(params) {
     },
     headers: data.headers,
     groupValues: uniqueValues(data.rawRows, activity.groupField),
-    subgroupValues: uniqueValues(data.rawRows, activity.subgroupField)
+    subgroupValues: uniqueValues(data.rawRows, activity.subgroupField),
+    subgroupsByGroup: subgroupsByGroupArr,
+    recColWidths: computeRecColWidths(data.headers, data.rawRows, displayFields)
   };
 }
 
@@ -634,6 +651,48 @@ function readSpreadsheetData(activity) {
       .map(row => { const obj = {}; headers.forEach((h,i) => { obj[h] = row[i]; }); return obj; });
     return { ok: true, headers, rawRows };
   } catch (err) { return { ok: false, error: err.toString() }; }
+}
+
+/**
+ * 依實際填寫內容估算各顯示欄位的建議欄寬（px）
+ */
+function estimateTextUnits(text) {
+  let u = 0;
+  for (const ch of String(text)) {
+    u += ch.codePointAt(0) > 0x2E7F ? 2 : 1;
+  }
+  return u;
+}
+function computeRecColWidths(headers, rawRows, fields) {
+  const UNIT_PX = 7.5;
+  const PADDING_PX = 40;
+  const MIN_W = 76;
+  const MAX_W = 640;
+  const rec = {};
+  if (!fields || !fields.length) return rec;
+  fields.forEach(f => {
+    if (headers.indexOf(f) < 0) return;
+    const lens = [];
+    rawRows.forEach(row => {
+      const v = row[f];
+      if (v === null || v === undefined) return;
+      const s = String(v).trim();
+      if (s === '') return;
+      lens.push(estimateTextUnits(s));
+    });
+    let base = 0;
+    if (lens.length) {
+      const sum = lens.reduce(function(acc, v) { return acc + v; }, 0);
+      const avg = sum / lens.length;
+      const sorted = lens.slice().sort(function(a, b) { return a - b; });
+      const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.85));
+      base = Math.max(avg, sorted[idx]);
+    }
+    const headerUnits = Math.min(estimateTextUnits(f), 20);
+    const units = Math.max(base, Math.ceil(headerUnits / 2));
+    rec[f] = Math.max(MIN_W, Math.min(MAX_W, Math.round(units * UNIT_PX + PADDING_PX)));
+  });
+  return rec;
 }
 
 function setDefaultAdminPassword() {
