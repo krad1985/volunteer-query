@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>統計報表</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-light">
+  <div class="container py-4">
+    <h1 class="text-center mb-4">統計報表</h1>
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">活動</label>
+            <select id="activitySelect" class="form-select"></select>
+          </div>
+          <div class="col-md-2">
+            <button id="loadBtn" class="btn btn-primary w-100">載入報表</button>
+          </div>
+          <div class="col-md-2">
+            <a href="index.html" class="btn btn-outline-secondary w-100">返回查詢</a>
+          </div>
+        </div>
+        <p id="error" class="text-danger mt-2 d-none"></p>
+      </div>
+    </div>
+    <div id="reportArea" class="d-none">
+      <h3>一、整體人力</h3>
+      <div id="manpowerTable"></div>
+      <h3 class="mt-4">二、用餐狀況</h3>
+      <div id="mealsTable"></div>
+      <h3 class="mt-4">三、住宿狀況</h3>
+      <div id="lodgingTable"></div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/report.js"></script>
+</body>
+</html>
