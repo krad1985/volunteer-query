@@ -107,6 +107,7 @@ async function submitQuery() {
 }
 function renderTable(fields, rows) {
   const table = document.getElementById('dataTable');
+  table.classList.add('fixed-cols');
   const thead = table.querySelector('thead'); const tbody = table.querySelector('tbody');
   thead.innerHTML = ''; tbody.innerHTML = '';
   // colgroup for widths

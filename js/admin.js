@@ -157,7 +157,8 @@ function autoDetectDays() {
   });
   const days = Object.keys(groups).map(date => {
     const hs = groups[date];
-    const find = (kw) => hs.find(h => h.includes(kw)) || '';
+    // 從最後欄位往前看，優先取公式拆解後的 1/0 欄位
+    const find = (kw) => hs.slice().reverse().find(h => h.includes(kw)) || '';
     return {
       label: date,
       attendanceField: find('進駐') || find('正行') || find('出席') || '',
@@ -196,7 +197,8 @@ async function handleSaveActivity() {
     birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey
   };
   const res = await api('saveActivity', { ...authParams(), data: JSON.stringify(data) });
-  if (!res.ok) { alert(res.error); return; }
+  if (!res.ok) { alert('儲存失敗：' + res.error); return; }
+  alert('儲存成功');
   document.getElementById('activityModal').close();
   await loadActivities();
 }

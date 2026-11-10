@@ -672,8 +672,10 @@ function computeRecColWidths(headers, rawRows, fields) {
   if (!fields || !fields.length) return rec;
   fields.forEach(f => {
     if (headers.indexOf(f) < 0) return;
-    // 特定欄位至少容納 4 個中文字才換行
-    const minForField = (f === '身分別' || f === '大組' || f === '小組' || f === '姓名') ? 100 : MIN_W;
+    // 小組至少 5 個中文字；其他三欄至少 4 個中文字
+    let minForField = MIN_W;
+    if (f === '小組') minForField = 120;
+    else if (f === '身分別' || f === '大組' || f === '姓名') minForField = 100;
     const lens = [];
     rawRows.forEach(row => {
       const v = row[f];
