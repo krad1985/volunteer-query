@@ -1,8 +1,8 @@
 let activities = [];
 let currentActivity = null;
-let volunteerData = [];
+let currentFields = [];
+let currentRows = [];
 let headers = [];
-let passwordData = [];
 
 function api(action, params = {}) {
   const url = new URL(CONFIG.GAS_URL);
@@ -98,8 +98,11 @@ async function submitQuery() {
   if (role && fieldIndex['身分別'] !== undefined) rows = rows.filter(r => String(r[fieldIndex['身分別']] ?? '') === role);
   if (gender && fieldIndex['性別'] !== undefined) rows = rows.filter(r => String(r[fieldIndex['性別']] ?? '') === gender);
   if (search) rows = rows.filter(r => r.some(c => String(c).includes(search)));
-  renderTable(res.fields, rows);
+  currentFields = res.fields || [];
+  currentRows = rows;
+  renderTable(currentFields, currentRows);
   document.getElementById('results').classList.remove('d-none');
+  document.getElementById('resultCount').textContent = `共 ${rows.length} 筆`;
   showSuccess(`已載入 ${rows.length} 筆資料`);
 }
 function renderTable(fields, rows) {
@@ -135,4 +138,53 @@ function renderTable(fields, rows) {
     tbody.appendChild(tr);
   });
 }
-document.addEventListener('DOMContentLoaded', init);
+// 匯出 CSV
+function exportCsv() {
+  const fields = currentFields; const rows = currentRows;
+  if (!rows || rows.length === 0) { alert('目前沒有可匯出的資料'); return; }
+  const esc = v => { const s = v == null ? '' : String(v); return /[",\\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const actName = currentActivity?.name || '名冊';
+  const now = new Date().toLocaleString('zh-TW', { hour12: false });
+  const lines = [];
+  lines.push(fields.map(esc).join(','));
+  rows.forEach(r => lines.push(r.map(esc).join(',')));
+  const csv = '\\uFEFF' + lines.join('\\r\\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${actName}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+// 列印名冊
+function printRoster() {
+  const fields = currentFields; const rows = currentRows;
+  if (!rows || rows.length === 0) { alert('目前沒有可列印的資料'); return; }
+  const escHtml = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const actName = currentActivity?.name || '名冊';
+  const now = new Date().toLocaleString('zh-TW', { hour12: false });
+  const thead = '<thead><tr>' + fields.map(f => `<th>${escHtml(f)}</th>`).join('') + '</tr></thead>';
+  const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map(c => {
+    const h = fields[r.indexOf(c)] || '';
+    let val = c;
+    if (h && (h.includes('義工')||h.includes('早餐')||h.includes('午餐')||h.includes('晚餐')||h.includes('住宿'))) {
+      val = String(c)==='1' ? '☑' : (String(c)==='0' ? '☐' : '');
+    }
+    return `<td>${escHtml(val)}</td>`;
+  }).join('') + '</tr>').join('') + '</tbody>';
+  const win = window.open('', '_blank');
+  if (!win) { alert('請允許彈出視窗'); return; }
+  win.document.write(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${escHtml(actName)} 名冊</title><style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#222;padding:24px}
+  @page{size:A4 landscape;margin:12mm}table{width:100%;border-collapse:collapse;font-size:11px}
+  th,td{border:1px solid #444;padding:4px 6px;text-align:left;vertical-align:top;word-break:break-all}
+  thead th{background:#f0efe9}thead{display:table-header-group}tr{break-inside:avoid}
+  </style></head><body><div><h1>${escHtml(actName)} 名冊</h1><div>匯出時間：${escHtml(now)} ｜ 共 ${rows.length} 筆</div></div><table>${thead}${tbody}</table></body></html>`);
+  win.document.close(); win.focus();
+  setTimeout(() => { try { win.print(); } catch(e){} }, 250);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+  document.getElementById('btnPrintRoster').addEventListener('click', printRoster);
+});

@@ -672,6 +672,8 @@ function computeRecColWidths(headers, rawRows, fields) {
   if (!fields || !fields.length) return rec;
   fields.forEach(f => {
     if (headers.indexOf(f) < 0) return;
+    // 特定欄位至少容納 4 個中文字才換行
+    const minForField = (f === '身分別' || f === '大組' || f === '小組' || f === '姓名') ? 100 : MIN_W;
     const lens = [];
     rawRows.forEach(row => {
       const v = row[f];
@@ -690,7 +692,7 @@ function computeRecColWidths(headers, rawRows, fields) {
     }
     const headerUnits = Math.min(estimateTextUnits(f), 20);
     const units = Math.max(base, Math.ceil(headerUnits / 2));
-    rec[f] = Math.max(MIN_W, Math.min(MAX_W, Math.round(units * UNIT_PX + PADDING_PX)));
+    rec[f] = Math.max(minForField, Math.min(MAX_W, Math.round(units * UNIT_PX + PADDING_PX)));
   });
   return rec;
 }

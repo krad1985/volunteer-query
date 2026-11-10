@@ -1,3 +1,4 @@
+let lastReport = null;
 function api(action, params = {}) {
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
@@ -20,6 +21,8 @@ async function init() {
   const sel = document.getElementById('activitySelect');
   sel.innerHTML = (res.activities||[]).map(a => `<option value="${a.id}">${a.name}</option>`).join('');
   document.getElementById('loadBtn').onclick = loadReport;
+  document.getElementById('chkRole').addEventListener('change', () => { if (lastReport) { renderManpower(lastReport); renderMeals(lastReport); renderLodging(lastReport); } });
+  document.getElementById('chkGender').addEventListener('change', () => { if (lastReport) { renderManpower(lastReport); renderMeals(lastReport); renderLodging(lastReport); } });
 }
 async function loadReport() {
   const actId = document.getElementById('activitySelect').value;
@@ -27,42 +30,70 @@ async function loadReport() {
   if (!res.ok) { showError(res.error); return; }
   document.getElementById('error').classList.add('d-none');
   document.getElementById('reportArea').classList.remove('d-none');
+  lastReport = res;
   renderManpower(res);
   renderMeals(res);
   renderLodging(res);
 }
 function renderManpower(res) {
-  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th><th>總人數</th><th>男</th><th>女</th><th>幹部</th><th>一般義工</th>';
-  res.dayLabels.forEach(l => { html += `<th>${l} 男</th><th>${l} 女</th><th>${l} 合計</th>`; });
+  const chkGender = document.getElementById('chkGender').checked;
+  const chkRole = document.getElementById('chkRole').checked;
+  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th><th>總人數</th>';
+  if (chkGender) html += '<th>男</th><th>女</th>';
+  if (chkRole) html += '<th>幹部</th><th>一般義工</th>';
+  res.dayLabels.forEach(l => {
+    if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`;
+    html += `<th>${l} 合計</th>`;
+  });
   html += '</tr></thead><tbody>';
+  const rowCells = (s, isTotal) => {
+    let c = '';
+    if (isTotal) c += `<td colspan="2">${isTotal}</td>`;
+    else c += `<td>${s._g}</td><td>${s.name}</td>`;
+    c += `<td>${s.headcount.total}</td>`;
+    if (chkGender) c += `<td>${s.headcount.male}</td><td>${s.headcount.female}</td>`;
+    if (chkRole) c += `<td>${s.headcount.cadre}</td><td>${s.headcount.volunteer}</td>`;
+    s.manpowerByDay.forEach(d => {
+      if (chkGender) c += `<td>${d.male}</td><td>${d.female}</td>`;
+      c += `<td>${d.total}</td>`;
+    });
+    return c;
+  };
   res.groups.forEach(g => {
     g.subgroups.forEach(s => {
-      html += `<tr><td>${g.name}</td><td>${s.name}</td><td>${s.headcount.total}</td><td>${s.headcount.male}</td><td>${s.headcount.female}</td><td>${s.headcount.cadre}</td><td>${s.headcount.volunteer}</td>`;
-      s.manpowerByDay.forEach(d => { html += `<td>${d.male}</td><td>${d.female}</td><td>${d.total}</td>`; });
-      html += '</tr>';
+      s._g = g.name;
+      html += `<tr>${rowCells(s, false)}</tr>`;
     });
-    // group subtotal
-    html += `<tr class="table-secondary"><td>${g.name}</td><td>小計</td><td>${g.headcount.total}</td><td>${g.headcount.male}</td><td>${g.headcount.female}</td><td>${g.headcount.cadre}</td><td>${g.headcount.volunteer}</td>`;
-    g.manpowerByDay.forEach(d => { html += `<td>${d.male}</td><td>${d.female}</td><td>${d.total}</td>`; });
-    html += '</tr>';
+    g._g = g.name;
+    // group subtotal uses g aggregate
+    html += `<tr class="table-secondary">${rowCells({name:'小計', headcount: g.headcount, manpowerByDay: g.manpowerByDay}, '小計')}</tr>`;
   });
-  // grand total
-  html += `<tr class="table-dark"><td colspan="2">總計</td><td>${res.total.headcount.total}</td><td>${res.total.headcount.male}</td><td>${res.total.headcount.female}</td><td>${res.total.headcount.cadre}</td><td>${res.total.headcount.volunteer}</td>`;
-  res.total.manpowerByDay.forEach(d => { html += `<td>${d.male}</td><td>${d.female}</td><td>${d.total}</td>`; });
-  html += '</tr></tbody></table>';
+  html += `<tr class="table-dark">${rowCells({name:'總計', headcount: res.total.headcount, manpowerByDay: res.total.manpowerByDay}, '總計')}</tr>`;
+  html += '</tbody></table>';
   document.getElementById('manpowerTable').innerHTML = html;
 }
 function renderMeals(res) {
+  const chkGender = document.getElementById('chkGender').checked;
   let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
-  res.dayLabels.forEach(l => { html += `<th>${l} 早男</th><th>${l} 早女</th><th>${l} 早計</th><th>${l} 午男</th><th>${l} 午女</th><th>${l} 午計</th><th>${l} 晚男</th><th>${l} 晚女</th><th>${l} 晚計</th>`; });
+  res.dayLabels.forEach(l => {
+    if (chkGender) html += `<th>${l} 早男</th><th>${l} 早女</th>`;
+    html += `<th>${l} 早計</th>`;
+    if (chkGender) html += `<th>${l} 午男</th><th>${l} 午女</th>`;
+    html += `<th>${l} 午計</th>`;
+    if (chkGender) html += `<th>${l} 晚男</th><th>${l} 晚女</th>`;
+    html += `<th>${l} 晚計</th>`;
+  });
   html += '</tr></thead><tbody>';
   res.groups.forEach(g => {
     g.subgroups.forEach(s => {
       html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
       s.mealsByDay.forEach(d => {
-        html += `<td>${d.breakfast.male}</td><td>${d.breakfast.female}</td><td>${d.breakfast.total}</td>`;
-        html += `<td>${d.lunch.male}</td><td>${d.lunch.female}</td><td>${d.lunch.total}</td>`;
-        html += `<td>${d.dinner.male}</td><td>${d.dinner.female}</td><td>${d.dinner.total}</td>`;
+        if (chkGender) html += `<td>${d.breakfast.male}</td><td>${d.breakfast.female}</td>`;
+        html += `<td>${d.breakfast.total}</td>`;
+        if (chkGender) html += `<td>${d.lunch.male}</td><td>${d.lunch.female}</td>`;
+        html += `<td>${d.lunch.total}</td>`;
+        if (chkGender) html += `<td>${d.dinner.male}</td><td>${d.dinner.female}</td>`;
+        html += `<td>${d.dinner.total}</td>`;
       });
       html += '</tr>';
     });
@@ -71,20 +102,32 @@ function renderMeals(res) {
   document.getElementById('mealsTable').innerHTML = html;
 }
 function renderLodging(res) {
+  const chkGender = document.getElementById('chkGender').checked;
   let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
-  res.dayLabels.forEach(l => { html += `<th>${l} 男</th><th>${l} 女</th><th>${l} 合計</th>`; });
-  html += '<th>最大床位(男)</th><th>最大床位(女)</th><th>最大床位(合計)</th></tr></thead><tbody>';
+  res.dayLabels.forEach(l => {
+    if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`;
+    html += `<th>${l} 合計</th>`;
+  });
+  if (chkGender) html += '<th>最大床位(男)</th><th>最大床位(女)</th>';
+  html += '<th>最大床位(合計)</th></tr></thead><tbody>';
   res.groups.forEach(g => {
     g.subgroups.forEach(s => {
       html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
-      s.lodgingByDay.forEach(d => { html += `<td>${d.male}</td><td>${d.female}</td><td>${d.total}</td>`; });
-      html += `<td>${s.maxBed.male}</td><td>${s.maxBed.female}</td><td>${s.maxBed.total}</td></tr>`;
+      s.lodgingByDay.forEach(d => {
+        if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`;
+        html += `<td>${d.total}</td>`;
+      });
+      if (chkGender) html += `<td>${s.maxBed.male}</td><td>${s.maxBed.female}</td>`;
+      html += `<td>${s.maxBed.total}</td></tr>`;
     });
   });
-  // grand
   html += `<tr class="table-dark"><td colspan="2">總計</td>`;
-  res.total.lodgingByDay.forEach(d => { html += `<td>${d.male}</td><td>${d.female}</td><td>${d.total}</td>`; });
-  html += `<td>${res.total.maxBed.male}</td><td>${res.total.maxBed.female}</td><td>${res.total.maxBed.total}</td></tr>`;
+  res.total.lodgingByDay.forEach(d => {
+    if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`;
+    html += `<td>${d.total}</td>`;
+  });
+  if (chkGender) html += `<td>${res.total.maxBed.male}</td><td>${res.total.maxBed.female}</td>`;
+  html += `<td>${res.total.maxBed.total}</td></tr>`;
   html += '</tbody></table>';
   document.getElementById('lodgingTable').innerHTML = html;
 }
