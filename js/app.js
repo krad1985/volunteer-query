@@ -121,16 +121,17 @@ function renderTable(fields, rows) {
     cg.appendChild(col);
   });
   const tr = document.createElement('tr');
-  fields.forEach(f => { const th = document.createElement('th'); th.textContent = f; tr.appendChild(th); });
+  fields.forEach(f => { const th = document.createElement('th'); th.textContent = f; th.className = 'px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap border-b border-gray-200'; tr.appendChild(th); });
   thead.appendChild(tr);
   rows.forEach(row => {
     const tr = document.createElement('tr');
     row.forEach((cell, i) => {
       const td = document.createElement('td');
       const h = fields[i];
+      td.className = 'px-3 py-2 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap';
       if (h && (h.includes('義工') || h.includes('早餐') || h.includes('午餐') || h.includes('晚餐') || h.includes('住宿'))) {
         td.textContent = String(cell) === '1' ? '☑' : (String(cell)==='0' ? '☐' : '');
-        td.classList.add('text-center');
+        td.classList.add('text-center', 'text-lg');
       } else {
         td.textContent = cell ?? '';
       }
