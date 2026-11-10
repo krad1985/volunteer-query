@@ -1,14 +1,22 @@
 function api(action, params = {}) {
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
+  const token = sessionStorage.getItem('publicToken');
+  if (token && !params.token) params.token = token;
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
   return fetch(url).then(r => r.json());
 }
 function showError(msg){ const e=document.getElementById('error'); e.textContent=msg; e.classList.remove('d-none'); }
 
 async function init() {
-  const res = await api('listActivities', {});
+  const params = new URLSearchParams(location.search);
+  const unit = params.get('unit') || '';
+  const unitToken = params.get('unitToken') || '';
+  const lp = {};
+  if (unit) { lp.unit = unit; lp.unitToken = unitToken; }
+  const res = await api('listActivities', lp);
   if (!res.ok) { showError(res.error); return; }
+  if (res.publicToken) sessionStorage.setItem('publicToken', res.publicToken);
   const sel = document.getElementById('activitySelect');
   sel.innerHTML = (res.activities||[]).map(a => `<option value="${a.id}">${a.name}</option>`).join('');
   document.getElementById('loadBtn').onclick = loadReport;

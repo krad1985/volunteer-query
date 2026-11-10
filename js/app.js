@@ -11,11 +11,13 @@ function api(action, params = {}) {
   return fetch(url).then(r => r.json());
 }
 function authParams() {
-  // 前端查詢不需管理密碼；活動金鑰由 URL ?key= 帶入
   const p = new URLSearchParams(location.search);
-  const key = p.get('key');
-  if (key) return { key };
-  return {};
+  const key = p.get('key') || sessionStorage.getItem('pendingKey') || '';
+  const token = sessionStorage.getItem('publicToken') || '';
+  const out = {};
+  if (token) out.token = token;
+  if (key) out.key = key;
+  return out;
 }
 function showError(msg){ const e=document.getElementById('error'); e.textContent=msg; e.classList.remove('d-none'); document.getElementById('success').classList.add('d-none'); }
 function showSuccess(msg){ const e=document.getElementById('success'); e.textContent=msg; e.classList.remove('d-none'); document.getElementById('error').classList.add('d-none'); }
@@ -24,9 +26,16 @@ async function init() {
   try {
     const params = new URLSearchParams(location.search);
     const urlAct = params.get('act');
-    const res = await api('listActivities', {});
+    const urlKey = params.get('key');
+    const unit = params.get('unit') || '';
+    const unitToken = params.get('unitToken') || '';
+    if (urlKey) sessionStorage.setItem('pendingKey', urlKey);
+    const lp = {};
+    if (unit) { lp.unit = unit; lp.unitToken = unitToken; }
+    const res = await api('listActivities', lp);
     if (!res.ok) throw new Error(res.error || '載入活動失敗');
     activities = res.activities || [];
+    if (res.publicToken) sessionStorage.setItem('publicToken', res.publicToken);
     const sel = document.getElementById('activitySelect');
     sel.innerHTML = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('') || '<option value="">（無活動）</option>';
     if (urlAct && activities.some(a=>a.id===urlAct)) sel.value = urlAct;
