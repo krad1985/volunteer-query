@@ -460,6 +460,7 @@ function handleSaveActivity(params) {
     if (!unit) return { ok: false, error: '找不到該單位' };
     if (!verifyUnitAdminPassword(unit, params.unitPwd)) return { ok: false, error: '單位管理密碼錯誤' };
     const activityData = JSON.parse(params.data || '{}');
+    if (!activityData.sheetId && activityData.sheetUrl) activityData.sheetId = extractSheetId(activityData.sheetUrl);
     activityData.unit = unit.id;
     activityData.protectedCategories = activityData.protectedCategories || {};
     activityData.cacheVersion = (activityData.cacheVersion || 0) + 1;
@@ -477,6 +478,7 @@ function handleSaveActivity(params) {
   }
   if (!verifyAdminPassword(params.pwd)) return { ok: false, error: '管理密碼錯誤' };
   const activityData = JSON.parse(params.data || '{}');
+  if (!activityData.sheetId && activityData.sheetUrl) activityData.sheetId = extractSheetId(activityData.sheetUrl);
   activityData.protectedCategories = activityData.protectedCategories || {};
   activityData.cacheVersion = (activityData.cacheVersion || 0) + 1;
   if (!activityData.id) {

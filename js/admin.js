@@ -176,6 +176,8 @@ async function handleSaveActivity() {
   const name = document.getElementById('actName').value.trim();
   const sheetUrl = document.getElementById('actSheetUrl').value.trim();
   const sheetName = document.getElementById('actSheetName').value.trim();
+  const sheetId = extractSheetId(sheetUrl);
+  if (!sheetId) { alert('無法解析試算表 ID，請確認網址格式'); return; }
   const groupField = document.getElementById('mapGroup').value;
   const subgroupField = document.getElementById('mapSubgroup').value;
   const roleField = document.getElementById('mapRole').value;
@@ -190,7 +192,7 @@ async function handleSaveActivity() {
   if (!name || !sheetUrl) { alert('請填寫名稱與試算表網址'); return; }
   const data = {
     id: document.getElementById('editActivityId').value || undefined,
-    name, sheetUrl, sheetName: sheetName || undefined, groupField, subgroupField, roleField, genderField,
+    name, sheetId, sheetUrl, sheetName: sheetName || undefined, groupField, subgroupField, roleField, genderField,
     birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey
   };
   const res = await api('saveActivity', { ...authParams(), data: JSON.stringify(data) });
