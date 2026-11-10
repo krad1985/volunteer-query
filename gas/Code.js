@@ -81,6 +81,11 @@ function handleGetActivityInfo(params) {
   if (!actId) return { ok: false, error: '缺少活動 ID' };
   const activity = getActivityById(actId);
   if (!activity) return { ok: false, error: '找不到該活動' };
+  // 向下相容：舊活動若無 sheetId，從 sheetUrl 補上並存回
+  if (!activity.sheetId && activity.sheetUrl) {
+    activity.sheetId = extractSheetId(activity.sheetUrl);
+    if (activity.sheetId) saveActivityRecord(activity);
+  }
   const auth = authorizeActivity(params, activity);
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
   const data = readSpreadsheetData(activity);
