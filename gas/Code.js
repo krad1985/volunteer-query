@@ -13,6 +13,9 @@ const CACHE_PREFIX = 'VOL_V2_DATA_';
 const CACHE_TTL = 60;
 
 /* ===== 主進入點 ===== */
+function doPost(e) {
+  return doGet(e);
+}
 function doGet(e) {
   const action = e?.parameter?.action || 'listActivities';
   let result;

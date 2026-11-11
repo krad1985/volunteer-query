@@ -131,7 +131,46 @@ function renderTable(fields, rows) {
       td.className = 'px-3 py-2 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap';
       if (h && (h.includes('義工') || h.includes('早餐') || h.includes('午餐') || h.includes('晚餐') || h.includes('住宿'))) {
         td.textContent = String(cell) === '1' ? '☑' : (String(cell)==='0' ? '☐' : '');
-        td.classList.add('text-center', 'text-lg');
+        td.classList.add('text-center', 'text-lg', 'text-green-600');
+      } else if (h && (h === '電話' || h.includes('電話'))) {
+        renderPhoneCell(td, cell);
+      } else if (h && h.includes('電話') && cell) {
+        const phone = String(cell).replace(/[^0-9]/g, '');
+        const masked = phone.length >= 8 ? phone.substring(0, 4) + '***' + phone.substring(phone.length - 3) : '***';
+        td.textContent = masked;
+        td.dataset.phone = phone;
+        td.classList.add('cursor-pointer', 'select-none');
+        td.title = '長按 3 秒解鎖顯示';
+        let timer = null;
+        const start = () => {
+          if (td.dataset.revealed === '1') return;
+          td.classList.add('bg-red-50');
+          const bar = document.createElement('div');
+          bar.className = 'absolute bottom-0 left-0 h-0.5 bg-red-500';
+          bar.style.width = '0%';
+          bar.style.transition = 'width 3s linear';
+          td.style.position = 'relative';
+          td.appendChild(bar);
+          requestAnimationFrame(() => { bar.style.width = '100%'; });
+          timer = setTimeout(() => {
+            td.textContent = phone;
+            td.dataset.revealed = '1';
+            td.classList.remove('bg-red-50');
+            bar.remove();
+          }, 3000);
+        };
+        const cancel = () => {
+          if (timer) { clearTimeout(timer); timer = null; }
+          td.classList.remove('bg-red-50');
+          const bar = td.querySelector('.bg-red-500');
+          if (bar) bar.remove();
+        };
+        td.addEventListener('mousedown', start);
+        td.addEventListener('mouseup', cancel);
+        td.addEventListener('mouseleave', cancel);
+        td.addEventListener('touchstart', start);
+        td.addEventListener('touchend', cancel);
+        td.addEventListener('contextmenu', e => e.preventDefault());
       } else {
         td.textContent = cell ?? '';
       }

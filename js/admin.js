@@ -4,6 +4,13 @@ let availableFields = [];
 let availableHeaders = [];
 
 function api(action, params = {}) {
+  // 大型資料（如活動設定）改用 POST，避免 GET URL 長度限制
+  if (params.data) {
+    const body = new URLSearchParams();
+    body.set('action', action);
+    Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') body.set(k, v); });
+    return fetch(CONFIG.GAS_URL, { method: 'POST', body }).then(r => r.json());
+  }
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
@@ -99,7 +106,7 @@ function openModal(actId = null) {
         setDropdown('mapSubgroup', act.subgroupField);
         setDropdown('mapRole', act.roleField);
         setDropdown('mapGender', act.genderField);
-        setDropdown('mapBirth', act.birthYearField);
+
         setDropdown('mapName', act.nameField);
         setDropdown('mapPhone', act.phoneField);
         // display fields
@@ -127,7 +134,7 @@ async function handleTestConnection(silent = false) {
   document.getElementById('fieldMapping').classList.remove('d-none');
   // populate dropdowns
   const opts = '<option value="">（請選擇）</option>' + availableFields.map(f => `<option value="${f}">${f}</option>`).join('');
-  ['mapGroup','mapSubgroup','mapRole','mapGender','mapBirth','mapName','mapPhone'].forEach(id => {
+  ['mapGroup','mapSubgroup','mapRole','mapGender','mapName','mapPhone'].forEach(id => {
     document.getElementById(id).innerHTML = opts;
   });
   renderDisplayFields([]);
@@ -183,7 +190,7 @@ async function handleSaveActivity() {
   const subgroupField = document.getElementById('mapSubgroup').value;
   const roleField = document.getElementById('mapRole').value;
   const genderField = document.getElementById('mapGender').value;
-  const birthYearField = document.getElementById('mapBirth').value;
+  const birthYearField = '';
   const nameField = document.getElementById('mapName').value;
   const phoneField = document.getElementById('mapPhone').value;
   const accessKey = document.getElementById('actAccessKey').value.trim();
