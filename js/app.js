@@ -2,6 +2,7 @@ let activities = [];
 let currentActivity = null;
 let currentFields = [];
 let currentRows = [];
+let allRows = [];
 let headers = [];
 
 function api(action, params = {}) {
@@ -27,6 +28,9 @@ async function init() {
     const params = new URLSearchParams(location.search);
     const urlAct = params.get('act');
     const urlKey = params.get('key');
+    const urlGroup = params.get('group');
+    const urlSubgroup = params.get('subgroup');
+    const urlPwd = params.get('pwd');
     const unit = params.get('unit') || '';
     const unitToken = params.get('unitToken') || '';
     if (urlKey) sessionStorage.setItem('pendingKey', urlKey);
@@ -41,8 +45,46 @@ async function init() {
     if (urlAct && activities.some(a=>a.id===urlAct)) sel.value = urlAct;
     sel.addEventListener('change', () => loadActivity(sel.value));
     await loadActivity(sel.value);
+    // URL 參數自動篩選
+    if (urlGroup) {
+      const gSel = document.getElementById('groupSelect');
+      gSel.value = urlGroup;
+      gSel.dispatchEvent(new Event('change'));
+      if (urlSubgroup) {
+        const sSel = document.getElementById('subgroupSelect');
+        // wait for options
+        setTimeout(() => {
+          sSel.value = urlSubgroup;
+          sSel.dispatchEvent(new Event('change'));
+          if (urlPwd) document.getElementById('passwordInput').value = urlPwd;
+          // auto submit if possible
+          setTimeout(() => {
+            const btn = document.getElementById('submitBtn');
+            if (!btn.disabled) btn.click();
+          }, 100);
+        }, 100);
+      }
+    }
     document.getElementById('loading').classList.add('d-none');
     document.getElementById('content').classList.remove('d-none');
+    // 即時搜尋
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        if (!allRows.length) return;
+        const kw = searchInput.value.trim().toLowerCase();
+        const role = document.getElementById('roleSelect').value;
+        const gender = document.getElementById('genderSelect').value;
+        const fieldIndex = Object.fromEntries(currentFields.map((f,i)=>[f,i]));
+        let rows = allRows.slice();
+        if (role && fieldIndex['身分別'] !== undefined) rows = rows.filter(r => String(r[fieldIndex['身分別']] ?? '') === role);
+        if (gender && fieldIndex['性別'] !== undefined) rows = rows.filter(r => String(r[fieldIndex['性別']] ?? '') === gender);
+        if (kw) rows = rows.filter(r => r.some(c => String(c).toLowerCase().includes(kw)));
+        currentRows = rows;
+        renderTable(currentFields, currentRows);
+        document.getElementById('resultCount').textContent = `共 ${rows.length} 筆`;
+      });
+    }
   } catch (err) {
     document.getElementById('loading').textContent = '載入失敗：' + err.message;
   }
@@ -57,21 +99,26 @@ async function loadActivity(actId) {
   window._recColWidths = res.recColWidths || {};
   window._subgroupsByGroup = res.subgroupsByGroup || {};
   const groupSel = document.getElementById('groupSelect');
-  groupSel.innerHTML = '<option value="">請選擇大組</option>' + (res.groupValues||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
+  const subSel = document.getElementById('subgroupSelect');
+  groupSel.innerHTML = '<option value="">請選擇大組（或留空查全部）</option>' + (res.groupValues||[]).map(v=>`<option value="${v}">${v}</option>`).join('');
+  subSel.innerHTML = '<option value="">請選擇小組</option>';
+  subSel.disabled = true;
   groupSel.onchange = () => {
-    const subSel = document.getElementById('subgroupSelect');
     subSel.innerHTML = '<option value="">請選擇小組</option>';
     subSel.disabled = !groupSel.value;
-    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').disabled = !(groupSel.value === '' || subSel.value);
     document.getElementById('results').classList.add('d-none');
     showSuccess('');
     if (groupSel.value) {
       const subs = (window._subgroupsByGroup[groupSel.value] || []);
-      // 特殊：大組底下的「大組」小組代表該大組幹部，保留但標示
       subSel.innerHTML = '<option value="">請選擇小組</option>' +
         subs.map(v => `<option value="${v}">${v === '大組' ? '大組（幹部）' : v}</option>`).join('') +
         '<option value="選擇全部">選擇全部</option>';
     }
+  };
+  subSel.onchange = () => {
+    document.getElementById('submitBtn').disabled = !(groupSel.value === '' || subSel.value);
+    document.getElementById('results').classList.add('d-none');
   };
   const roleSel = document.getElementById('roleSelect');
   // role values from data not available; keep generic
@@ -93,6 +140,7 @@ async function submitQuery() {
   const res = await api('getList', { act: actId, group, subgroup, pwd: password, ...authParams() });
   if (!res.ok) { showError(res.error || '查詢失敗'); document.getElementById('results').classList.add('d-none'); return; }
   let rows = res.rows || [];
+  allRows = rows.slice();
   // client-side filters
   const fieldIndex = Object.fromEntries(res.fields.map((f,i)=>[f,i]));
   if (role && fieldIndex['身分別'] !== undefined) rows = rows.filter(r => String(r[fieldIndex['身分別']] ?? '') === role);
