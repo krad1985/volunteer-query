@@ -17,6 +17,10 @@ function api(action, params = {}) {
   return fetch(url).then(r => r.json());
 }
 function authParams() { return { pwd: adminPassword }; }
+function extractSheetId(url) {
+  const m = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
 function showError(el, msg) { if (typeof el === 'string') el = document.getElementById(el); el.textContent = msg; el.className = 'text-danger small'; }
 function showOk(el, msg) { if (typeof el === 'string') el = document.getElementById(el); el.textContent = msg; el.className = 'text-success small'; }
 
