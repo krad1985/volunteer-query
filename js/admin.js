@@ -3,6 +3,9 @@ let activities = [];
 let availableFields = [];
 let availableHeaders = [];
 let adminPublicToken = '';
+let loginRole = 'admin';
+let currentUnit = null;
+let units = [];
 
 function api(action, params = {}) {
   // 大型資料（如活動設定）改用 POST，避免 GET URL 長度限制
@@ -17,7 +20,10 @@ function api(action, params = {}) {
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
   return fetch(url).then(r => r.json());
 }
-function authParams() { return { pwd: adminPassword }; }
+function authParams() {
+  if (loginRole === 'unit' && currentUnit) return { unit: currentUnit.id, unitPwd: adminPassword };
+  return { pwd: adminPassword };
+}
 function extractSheetId(url) {
   const m = (url || '').match(/\/d\/([a-zA-Z0-9-_]+)/);
   return m ? m[1] : null;
@@ -28,6 +34,22 @@ function showOk(el, msg) { if (typeof el === 'string') el = document.getElementB
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnLogin').onclick = handleLogin;
   document.getElementById('adminPwd').addEventListener('keydown', e => e.key === 'Enter' && handleLogin());
+  document.getElementById('loginRole').addEventListener('change', e => {
+    const isUnit = e.target.value === 'unit';
+    document.getElementById('loginUnitWrap').classList.toggle('d-none', !isUnit);
+  });
+  loadPublicUnits();
+
+  // 單位管理
+  document.getElementById('btnAddUnit').onclick = () => {
+    document.getElementById('unitForm').classList.remove('d-none');
+    document.getElementById('unitName').value = '';
+    document.getElementById('unitPwd').value = '';
+    document.getElementById('unitHint').textContent = '';
+  };
+  document.getElementById('btnCancelUnit').onclick = () => document.getElementById('unitForm').classList.add('d-none');
+  document.getElementById('btnCreateUnit').onclick = handleCreateUnit;
+
   document.getElementById('btnAddActivity').onclick = () => openModal();
   document.getElementById('btnCloseModal').onclick = () => document.getElementById('activityModal').close();
   document.getElementById('btnTestConnection').onclick = handleTestConnection;
@@ -59,7 +81,8 @@ let adminReportTab = 'manpower';
 async function loadAdminReport() {
   const actId = document.getElementById('reportActivitySelect')?.value;
   if (!actId) { alert('請選擇活動'); return; }
-  const res = await api('getReport', { act: actId, token: adminPublicToken, adminPwd: adminPassword });
+  const token = loginRole === 'unit' ? (currentUnit?.token || '') : adminPublicToken;
+  const res = await api('getReport', { act: actId, token, ...authParams() });
   if (!res.ok) { alert(res.error || '載入報表失敗'); return; }
   window._lastAdminReport = res;
   renderAdminReport(res);
@@ -242,34 +265,130 @@ function buildLodgingTable(res, meta, opt) {
 }
 
 async function handleLogin() {
+  const role = document.getElementById('loginRole').value;
   const pwd = document.getElementById('adminPwd').value.trim();
-  if (!pwd) { showError('loginHint','請輸入密碼'); return; }
-  const res = await api('admin_login', { pwd });
-  if (!res.ok) { showError('loginHint', res.error || '密碼錯誤'); return; }
+  if (!pwd) { showError('loginHint', '請輸入密碼'); return; }
+  if (role === 'unit') {
+    const unitId = document.getElementById('loginUnit').value;
+    if (!unitId) { showError('loginHint', '請選擇單位'); return; }
+    const res = await api('unit_login', { unit: unitId, pwd });
+    if (!res.ok) { showError('loginHint', res.error || '登入失敗'); return; }
+    loginRole = 'unit';
+    currentUnit = res.unit;
+  } else {
+    const res = await api('admin_login', { pwd });
+    if (!res.ok) { showError('loginHint', res.error || '密碼錯誤'); return; }
+    loginRole = 'admin';
+    currentUnit = null;
+  }
   adminPassword = pwd;
   showOk('loginHint', '登入成功');
   document.getElementById('loginSection').classList.add('d-none');
   document.getElementById('adminPanel').classList.remove('d-none');
+  document.getElementById('unitCard').classList.toggle('d-none', loginRole !== 'admin');
+  document.getElementById('actUnitWrap').classList.toggle('d-none', loginRole !== 'admin');
   await loadActivities();
 }
 
+async function loadPublicUnits() {
+  const res = await api('listUnitsPublic');
+  const sel = document.getElementById('loginUnit');
+  if (!sel) return;
+  const list = (res && res.ok) ? res.units : [];
+  sel.innerHTML = list.length
+    ? list.map(u => `<option value="${u.id}">${u.name}</option>`).join('')
+    : '<option value="">（尚無單位）</option>';
+}
+
 async function loadActivities() {
-  const res = await api('getConfig', { pwd: adminPassword });
+  const res = await api('getConfig', authParams());
   if (!res.ok) { alert(res.error); return; }
   activities = res.config?.activities || [];
   adminPublicToken = res.config?.publicToken || '';
+  units = res.config?.units || [];
   renderActivityList();
+  renderUnits();
   const rsel = document.getElementById('reportActivitySelect');
   if (rsel) rsel.innerHTML = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const asel = document.getElementById('actUnit');
+  if (asel) {
+    asel.innerHTML = '<option value="">（不分單位）</option>' +
+      units.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+  }
+}
+
+function renderUnits() {
+  const box = document.getElementById('unitList');
+  if (!box) return;
+  if (loginRole !== 'admin') { box.innerHTML = ''; return; }
+  if (!units.length) { box.innerHTML = '<p class="text-muted small mb-0">尚無單位。單位用於隔離不同分會／教室的活動與名單。</p>'; return; }
+  const base = location.href.replace(/admin\.html.*/, 'index.html');
+  box.innerHTML = '<div class="table-responsive"><table class="table table-sm table-bordered align-middle mb-0"><thead><tr>' +
+    '<th>單位名稱</th><th>單位 ID</th><th>unitToken</th><th>活動數</th><th style="width:260px;">操作</th>' +
+    '</tr></thead><tbody>' +
+    units.map(u => {
+      const link = `${base}?unit=${encodeURIComponent(u.id)}&unitToken=${encodeURIComponent(u.token || '')}`;
+      return `<tr>
+        <td><strong>${u.name}</strong></td>
+        <td><code class="user-select-all small">${u.id}</code></td>
+        <td><code class="user-select-all small">${u.token || ''}</code></td>
+        <td>${u.activityCount || 0}</td>
+        <td>
+          <button class="btn btn-sm btn-outline-primary" onclick="copyUnitLink('${u.id}')">複製查詢網址</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="changeUnitPassword('${u.id}')">改密碼</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="removeUnit('${u.id}')">刪除</button>
+        </td>
+      </tr>`;
+    }).join('') + '</tbody></table></div>';
+}
+
+function copyUnitLink(unitId) {
+  const u = units.find(x => x.id === unitId);
+  if (!u) return;
+  const base = location.href.replace(/admin\.html.*/, 'index.html');
+  const link = `${base}?unit=${encodeURIComponent(u.id)}&unitToken=${encodeURIComponent(u.token || '')}`;
+  navigator.clipboard?.writeText(link);
+  alert('已複製查詢網址：\n' + link);
+}
+
+async function handleCreateUnit() {
+  const name = document.getElementById('unitName').value.trim();
+  const unitAdminPwd = document.getElementById('unitPwd').value.trim();
+  if (!name) { showError('unitHint', '請輸入單位名稱'); return; }
+  if (unitAdminPwd.length < 6) { showError('unitHint', '單位管理密碼至少 6 碼'); return; }
+  const res = await api('createUnit', { pwd: adminPassword, name, unitAdminPwd });
+  if (!res.ok) { showError('unitHint', res.error || '建立失敗'); return; }
+  document.getElementById('unitForm').classList.add('d-none');
+  await loadActivities();
+  await loadPublicUnits();
+}
+
+async function changeUnitPassword(unitId) {
+  const newPwd = prompt('請輸入新的單位管理密碼（至少 6 碼）');
+  if (!newPwd) return;
+  const res = await api('setUnitPassword', { pwd: adminPassword, id: unitId, newPwd });
+  if (!res.ok) { alert(res.error || '設定失敗'); return; }
+  alert('密碼已更新');
+}
+
+async function removeUnit(unitId) {
+  if (!confirm('確定刪除這個單位？（單位內有活動時不可刪除）')) return;
+  const res = await api('deleteUnit', { pwd: adminPassword, id: unitId });
+  if (!res.ok) { alert(res.error || '刪除失敗'); return; }
+  await loadActivities();
+  await loadPublicUnits();
 }
 
 function renderActivityList() {
   const ul = document.getElementById('activityList');
   if (!activities.length) { ul.innerHTML = '<li class="list-group-item text-muted">尚無活動</li>'; return; }
-  ul.innerHTML = activities.map(a => `
+  ul.innerHTML = activities.map(a => {
+    const u = a.unit ? units.find(x => x.id === a.unit) : null;
+    const badge = u ? `<span class="badge bg-info text-dark ms-2">${u.name}</span>` : '';
+    return `
     <li class="list-group-item d-flex justify-content-between align-items-center">
       <div>
-        <strong>${a.name}</strong>
+        <strong>${a.name}</strong>${badge}
         <div class="small text-muted">ID: <code class="user-select-all">${a.id}</code></div>
         <div class="small text-muted">大組欄位: ${a.groupField || '-'} / 小組: ${a.subgroupField || '-'} / 日期數: ${(a.dayMappings||[]).length}</div>
       </div>
@@ -278,13 +397,20 @@ function renderActivityList() {
         <button class="btn btn-sm btn-outline-secondary" onclick="openModal('${a.id}')">編輯</button>
         <button class="btn btn-sm btn-outline-danger" onclick="deleteActivity('${a.id}')">刪除</button>
       </div>
-    </li>
-  `).join('');
+    </li>`;
+  }).join('');
 }
 
 function viewActivity(id) {
   const base = location.href.replace(/admin\.html.*/, 'index.html');
-  window.open(base + '?act=' + id, '_blank');
+  const act = activities.find(a => a.id === id);
+  let url = base + '?act=' + encodeURIComponent(id);
+  const unitId = act && act.unit ? act.unit : (loginRole === 'unit' && currentUnit ? currentUnit.id : '');
+  if (unitId) {
+    const u = units.find(x => x.id === unitId) || (currentUnit && currentUnit.id === unitId ? currentUnit : null);
+    if (u) url += '&unit=' + encodeURIComponent(u.id) + '&unitToken=' + encodeURIComponent(u.token || '');
+  }
+  window.open(url, '_blank');
 }
 
 async function deleteActivity(id) {
@@ -302,6 +428,7 @@ function openModal(actId = null) {
   document.getElementById('actSheetUrl').value = '';
   document.getElementById('actSheetName').value = '';
   document.getElementById('actAccessKey').value = '';
+  document.getElementById('actUnit').value = '';
   document.getElementById('dayMappingsJson').value = '';
   document.getElementById('connectionHint').textContent = '';
   document.getElementById('fieldMapping').classList.add('d-none');
@@ -313,6 +440,7 @@ function openModal(actId = null) {
       document.getElementById('actSheetUrl').value = act.sheetUrl || '';
       document.getElementById('actSheetName').value = act.sheetName || '';
       document.getElementById('actAccessKey').value = act.accessKey || '';
+      document.getElementById('actUnit').value = act.unit || '';
       document.getElementById('dayMappingsJson').value = JSON.stringify(act.dayMappings || [], null, 2);
       // test connection silent
       handleTestConnection(true).then(() => {
@@ -416,7 +544,8 @@ async function handleSaveActivity() {
   const data = {
     id: document.getElementById('editActivityId').value || undefined,
     name, sheetId, sheetUrl, sheetName: sheetName || undefined, groupField, subgroupField, roleField, genderField,
-    birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey
+    birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey,
+    unit: document.getElementById('actUnit').value || undefined
   };
   const res = await api('saveActivity', { ...authParams(), data: JSON.stringify(data) });
   if (!res.ok) { alert('儲存失敗：' + res.error); return; }

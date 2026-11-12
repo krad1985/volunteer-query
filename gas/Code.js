@@ -193,9 +193,13 @@ function handleGetReport(params) {
   if (!actId) return { ok: false, error: '缺少活動 ID' };
   const activity = getActivityById(actId);
   if (!activity) return { ok: false, error: '找不到該活動' };
-  // 統計報表僅限管理員（後台）
-  if (!verifyAdminPassword(params.adminPwd || '')) {
+  // 統計報表僅限管理員或該單位管理員（後台）
+  const reportAuth = resolveAdminAuth(params);
+  if (!reportAuth) {
     return { ok: false, code: 'NEED_ADMIN', error: '統計報表僅限管理員使用' };
+  }
+  if (reportAuth.role === 'unit' && activity.unit !== reportAuth.unit.id) {
+    return { ok: false, error: '不可查看其他單位的活動' };
   }
   const auth = authorizeActivity(params, activity);
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
@@ -559,6 +563,7 @@ function handleSaveActivity(params) {
   if (!verifyAdminPassword(params.pwd)) return { ok: false, error: '管理密碼錯誤' };
   const activityData = JSON.parse(params.data || '{}');
   if (!activityData.sheetId && activityData.sheetUrl) activityData.sheetId = extractSheetId(activityData.sheetUrl);
+  if (activityData.unit && !getUnitById(activityData.unit)) return { ok: false, error: '找不到指定的單位' };
   activityData.protectedCategories = activityData.protectedCategories || {};
   activityData.cacheVersion = (activityData.cacheVersion || 0) + 1;
   if (!activityData.id) {
