@@ -54,7 +54,7 @@ let adminReportTab = 'manpower';
 async function loadAdminReport() {
   const actId = document.getElementById('reportActivitySelect')?.value;
   if (!actId) { alert('請選擇活動'); return; }
-  const res = await api('getReport', { act: actId, token: adminPublicToken });
+  const res = await api('getReport', { act: actId, token: adminPublicToken, adminPwd: adminPassword });
   if (!res.ok) { alert(res.error || '載入報表失敗'); return; }
   window._lastAdminReport = res;
   renderAdminReport(res);

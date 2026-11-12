@@ -193,6 +193,10 @@ function handleGetReport(params) {
   if (!actId) return { ok: false, error: '缺少活動 ID' };
   const activity = getActivityById(actId);
   if (!activity) return { ok: false, error: '找不到該活動' };
+  // 統計報表僅限管理員（後台）
+  if (!verifyAdminPassword(params.adminPwd || '')) {
+    return { ok: false, code: 'NEED_ADMIN', error: '統計報表僅限管理員使用' };
+  }
   const auth = authorizeActivity(params, activity);
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
 
