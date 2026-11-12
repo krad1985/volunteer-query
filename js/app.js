@@ -50,18 +50,17 @@ async function init() {
       const gSel = document.getElementById('groupSelect');
       gSel.value = urlGroup;
       gSel.dispatchEvent(new Event('change'));
-      if (urlSubgroup) {
+      setTimeout(() => {
         const sSel = document.getElementById('subgroupSelect');
+        const targetSub = urlSubgroup || '選擇全部';
+        sSel.value = targetSub;
+        sSel.dispatchEvent(new Event('change'));
+        if (urlPwd) document.getElementById('passwordInput').value = urlPwd;
         setTimeout(() => {
-          sSel.value = urlSubgroup;
-          sSel.dispatchEvent(new Event('change'));
-          if (urlPwd) document.getElementById('passwordInput').value = urlPwd;
-          setTimeout(() => {
-            const btn = document.getElementById('submitBtn');
-            if (!btn.disabled) btn.click();
-          }, 100);
+          const btn = document.getElementById('submitBtn');
+          if (!btn.disabled) btn.click();
         }, 100);
-      }
+      }, 100);
       // 隱藏篩選控制，只顯示該組內容
       const filterCard = document.getElementById('filterCard');
       if (filterCard) filterCard.style.display = 'none';
