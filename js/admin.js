@@ -46,8 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const chkRole = document.getElementById('reportChkRole');
   const chkGender = document.getElementById('reportChkGender');
-  if (chkRole) chkRole.addEventListener('change', () => { if (window._lastAdminReport) renderAdminReport(window._lastAdminReport); });
-  if (chkGender) chkGender.addEventListener('change', () => { if (window._lastAdminReport) renderAdminReport(window._lastAdminReport); });
+  const rerender = () => { if (window._lastAdminReport) renderAdminReport(window._lastAdminReport); };
+  if (chkRole) chkRole.addEventListener('change', rerender);
+  if (chkGender) chkGender.addEventListener('change', rerender);
+  ['reportChkRowSub', 'reportChkColSub'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', rerender);
+  });
 });
 
 let adminReportTab = 'manpower';
@@ -60,74 +65,180 @@ async function loadAdminReport() {
   renderAdminReport(res);
 }
 function renderAdminReport(res) {
-  const chkGender = document.getElementById('reportChkGender').checked;
-  const chkRole = document.getElementById('reportChkRole').checked;
+  const opt = {
+    gender: document.getElementById('reportChkGender').checked,
+    role: document.getElementById('reportChkRole').checked,
+    rowSub: document.getElementById('reportChkRowSub').checked,
+    colSub: document.getElementById('reportChkColSub').checked
+  };
   const tab = document.querySelector('#reportTabs .nav-link.active')?.dataset.tab || 'manpower';
+  const meta = res.dayMeta || (res.dayLabels || []).map(l => ({ label: l, attendance: true, breakfast: true, lunch: true, dinner: true, lodging: true }));
   let html = '';
-  if (tab === 'manpower') html = renderAdminManpower(res, chkGender, chkRole);
-  else if (tab === 'meals') html = renderAdminMeals(res, chkGender);
-  else html = renderAdminLodging(res, chkGender);
+  if (tab === 'manpower') html = buildManpowerTable(res, meta, opt);
+  else if (tab === 'meals') html = buildMealsTable(res, meta, opt);
+  else html = buildLodgingTable(res, meta, opt);
   document.getElementById('reportContainer').innerHTML = html;
 }
-function renderAdminManpower(res, chkGender, chkRole) {
-  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th><th>總人數</th>';
-  if (chkGender) html += '<th>男</th><th>女</th>';
-  if (chkRole) html += '<th>幹部</th><th>一般義工</th>';
-  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`; html += `<th>${l} 合計</th>`; });
+
+// 日期欄表頭：日期一行、項目一行，節省欄寬
+function dayHead(label, sub) {
+  return '<span class="d-block">' + (label || '') + '</span>' + (sub ? '<span class="d-block text-muted small">' + sub + '</span>' : '');
+}
+
+// headers: [{label, day}] day=true 代表可加總的每日欄（列小計只加這些）
+function buildReportTable(headers, rows, totals, opt) {
+  const dayIdx = [];
+  headers.forEach((h, i) => { if (h.day) dayIdx.push(i); });
+  let html = '<div class="table-responsive"><table class="table table-bordered table-sm report-table"><thead><tr>';
+  headers.forEach(h => { html += '<th>' + h.label + '</th>'; });
+  if (opt.rowSub) html += '<th class="sub-col">小計</th>';
   html += '</tr></thead><tbody>';
-  res.groups.forEach(g => {
-    g.subgroups.forEach(s => {
-      html += `<tr><td>${g.name}</td><td>${s.name}</td><td>${s.headcount.total}</td>`;
-      if (chkGender) html += `<td>${s.headcount.male}</td><td>${s.headcount.female}</td>`;
-      if (chkRole) html += `<td>${s.headcount.cadre}</td><td>${s.headcount.volunteer}</td>`;
-      s.manpowerByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
-      html += '</tr>';
+  rows.forEach(r => {
+    html += '<tr>';
+    r.cells.forEach((c, i) => {
+      const cls = [];
+      if (i === 0) cls.push('text-start');
+      if (i === 1) cls.push('text-start');
+      if (headers[i] && headers[i].day) cls.push('text-end');
+      html += '<td class="' + cls.join(' ') + '">' + (c === undefined || c === null ? '' : c) + '</td>';
     });
+    if (opt.rowSub) {
+      const sum = dayIdx.reduce((a, i) => a + (Number(r.cells[i]) || 0), 0);
+      html += '<td class="sub-col fw-semibold text-end">' + sum + '</td>';
+    }
+    html += '</tr>';
   });
-  html += '<tr class="table-dark"><td colspan="2">總計</td><td>' + res.total.headcount.total + '</td>';
-  if (chkGender) html += `<td>${res.total.headcount.male}</td><td>${res.total.headcount.female}</td>`;
-  if (chkRole) html += `<td>${res.total.headcount.cadre}</td><td>${res.total.headcount.volunteer}</td>`;
-  res.total.manpowerByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
-  html += '</tr></tbody></table>';
+  if (opt.colSub) {
+    html += '<tr class="table-dark fw-semibold">';
+    html += '<td colspan="2">總計</td>';
+    for (let i = 2; i < headers.length; i++) {
+      html += '<td class="' + (headers[i].day ? 'text-end' : '') + '">' + (totals[i] === undefined ? '' : totals[i]) + '</td>';
+    }
+    if (opt.rowSub) {
+      const sum = dayIdx.filter(i => i >= 2).reduce((a, i) => a + (Number(totals[i]) || 0), 0);
+      html += '<td class="text-end">' + sum + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
   return html;
 }
-function renderAdminMeals(res, chkGender) {
-  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
-  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 早男</th><th>${l} 早女</th>`; html += `<th>${l} 早計</th>`; if (chkGender) html += `<th>${l} 午男</th><th>${l} 午女</th>`; html += `<th>${l} 午計</th>`; if (chkGender) html += `<th>${l} 晚男</th><th>${l} 晚女</th>`; html += `<th>${l} 晚計</th>`; });
-  html += '</tr></thead><tbody>';
+
+function buildManpowerTable(res, meta, opt) {
+  const headers = [{ label: '大組' }, { label: '小組' }, { label: '總人數' }];
+  if (opt.gender) { headers.push({ label: '男' }, { label: '女' }); }
+  if (opt.role) { headers.push({ label: '幹部' }, { label: '一般義工' }); }
+  meta.forEach(m => {
+    if (!m.attendance) return;
+    if (opt.gender) { headers.push({ label: dayHead(m.label, '男') }, { label: dayHead(m.label, '女') }); }
+    headers.push({ label: dayHead(m.label, '合計'), day: true });
+  });
+
+  const rows = [];
   res.groups.forEach(g => {
     g.subgroups.forEach(s => {
-      html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
-      s.mealsByDay.forEach(d => {
-        if (chkGender) html += `<td>${d.breakfast.male}</td><td>${d.breakfast.female}</td>`; html += `<td>${d.breakfast.total}</td>`;
-        if (chkGender) html += `<td>${d.lunch.male}</td><td>${d.lunch.female}</td>`; html += `<td>${d.lunch.total}</td>`;
-        if (chkGender) html += `<td>${d.dinner.male}</td><td>${d.dinner.female}</td>`; html += `<td>${d.dinner.total}</td>`;
+      const cells = [g.name, s.name, s.headcount.total];
+      if (opt.gender) cells.push(s.headcount.male, s.headcount.female);
+      if (opt.role) cells.push(s.headcount.cadre, s.headcount.volunteer);
+      s.manpowerByDay.forEach((d, i) => {
+        if (!meta[i] || !meta[i].attendance) return;
+        if (opt.gender) cells.push(d.male, d.female);
+        cells.push(d.total);
       });
-      html += '</tr>';
+      rows.push({ cells });
     });
   });
-  html += '</tbody></table>';
-  return html;
+
+  const totals = ['總計', '', res.total.headcount.total];
+  if (opt.gender) totals.push(res.total.headcount.male, res.total.headcount.female);
+  if (opt.role) totals.push(res.total.headcount.cadre, res.total.headcount.volunteer);
+  res.total.manpowerByDay.forEach((d, i) => {
+    if (!meta[i] || !meta[i].attendance) return;
+    if (opt.gender) totals.push(d.male, d.female);
+    totals.push(d.total);
+  });
+  return buildReportTable(headers, rows, totals, opt);
 }
-function renderAdminLodging(res, chkGender) {
-  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
-  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`; html += `<th>${l} 合計</th>`; });
-  if (chkGender) html += '<th>最大床位(男)</th><th>最大床位(女)</th>';
-  html += '<th>最大床位(合計)</th></tr></thead><tbody>';
+
+function buildMealsTable(res, meta, opt) {
+  const meals = [['breakfast', '早餐'], ['lunch', '午餐'], ['dinner', '晚餐']];
+  const headers = [{ label: '大組' }, { label: '小組' }];
+  meta.forEach(m => {
+    meals.forEach(([key, name]) => {
+      if (!m[key]) return;
+      if (opt.gender) {
+        headers.push({ label: dayHead(m.label, name + '男') });
+        headers.push({ label: dayHead(m.label, name + '女') });
+      }
+      headers.push({ label: dayHead(m.label, name + '計'), day: true });
+    });
+  });
+
+  const rows = [];
   res.groups.forEach(g => {
     g.subgroups.forEach(s => {
-      html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
-      s.lodgingByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
-      if (chkGender) html += `<td>${s.maxBed.male}</td><td>${s.maxBed.female}</td>`;
-      html += `<td>${s.maxBed.total}</td></tr>`;
+      const cells = [g.name, s.name];
+      s.mealsByDay.forEach((d, i) => {
+        const m = meta[i] || {};
+        meals.forEach(([key]) => {
+          if (!m[key]) return;
+          if (opt.gender) cells.push(d[key].male, d[key].female);
+          cells.push(d[key].total);
+        });
+      });
+      rows.push({ cells });
     });
   });
-  html += '<tr class="table-dark"><td colspan="2">總計</td>';
-  res.total.lodgingByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
-  if (chkGender) html += `<td>${res.total.maxBed.male}</td><td>${res.total.maxBed.female}</td>`;
-  html += `<td>${res.total.maxBed.total}</td></tr>`;
-  html += '</tbody></table>';
-  return html;
+
+  const totals = ['總計', ''];
+  res.total.mealsByDay.forEach((d, i) => {
+    const m = meta[i] || {};
+    meals.forEach(([key]) => {
+      if (!m[key]) return;
+      if (opt.gender) totals.push(d[key].male, d[key].female);
+      totals.push(d[key].total);
+    });
+  });
+  return buildReportTable(headers, rows, totals, opt);
+}
+
+function buildLodgingTable(res, meta, opt) {
+  const headers = [{ label: '大組' }, { label: '小組' }];
+  meta.forEach(m => {
+    if (!m.lodging) return;
+    if (opt.gender) { headers.push({ label: dayHead(m.label, '男') }, { label: dayHead(m.label, '女') }); }
+    headers.push({ label: dayHead(m.label, '合計'), day: true });
+  });
+  if (opt.gender) {
+    headers.push({ label: '最大床位<br><span class="text-muted small">男</span>' });
+    headers.push({ label: '最大床位<br><span class="text-muted small">女</span>' });
+  }
+  headers.push({ label: '最大床位<br><span class="text-muted small">合計</span>' });
+
+  const rows = [];
+  res.groups.forEach(g => {
+    g.subgroups.forEach(s => {
+      const cells = [g.name, s.name];
+      s.lodgingByDay.forEach((d, i) => {
+        if (!meta[i] || !meta[i].lodging) return;
+        if (opt.gender) cells.push(d.male, d.female);
+        cells.push(d.total);
+      });
+      if (opt.gender) cells.push(s.maxBed.male, s.maxBed.female);
+      cells.push(s.maxBed.total);
+      rows.push({ cells });
+    });
+  });
+
+  const totals = ['總計', ''];
+  res.total.lodgingByDay.forEach((d, i) => {
+    if (!meta[i] || !meta[i].lodging) return;
+    if (opt.gender) totals.push(d.male, d.female);
+    totals.push(d.total);
+  });
+  if (opt.gender) totals.push(res.total.maxBed.male, res.total.maxBed.female);
+  totals.push(res.total.maxBed.total);
+  return buildReportTable(headers, rows, totals, opt);
 }
 
 async function handleLogin() {
@@ -159,6 +270,7 @@ function renderActivityList() {
     <li class="list-group-item d-flex justify-content-between align-items-center">
       <div>
         <strong>${a.name}</strong>
+        <div class="small text-muted">ID: <code class="user-select-all">${a.id}</code></div>
         <div class="small text-muted">大組欄位: ${a.groupField || '-'} / 小組: ${a.subgroupField || '-'} / 日期數: ${(a.dayMappings||[]).length}</div>
       </div>
       <div>

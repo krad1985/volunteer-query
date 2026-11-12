@@ -208,7 +208,18 @@ function handleGetReport(params) {
   const rf = activity.roleField;
   const gendf = activity.genderField;
   const byf = activity.birthYearField;
-  const days = activity.dayMappings || [];
+  // 略過完全空白的日期設定（label 與所有欄位皆空）
+  const days = (activity.dayMappings || []).filter(d => d && (
+    (d.label && String(d.label).trim()) || d.attendanceField || d.breakfastField ||
+    d.lunchField || d.dinnerField || d.lodgingField));
+  const dayMeta = days.map(d => ({
+    label: d.label,
+    attendance: !!d.attendanceField,
+    breakfast: !!d.breakfastField,
+    lunch: !!d.lunchField,
+    dinner: !!d.dinnerField,
+    lodging: !!d.lodgingField
+  }));
 
   // 過濾（可選）
   const filterGroup = params.group || '';
@@ -247,7 +258,7 @@ function handleGetReport(params) {
   // grand total
   const grand = buildAggregate(rows, days, rf, gendf, byf);
 
-  return { ok: true, name: activity.name, groups, total: grand, dayLabels: days.map(d=>d.label) };
+  return { ok: true, name: activity.name, groups, total: grand, dayLabels: days.map(d=>d.label), dayMeta };
 }
 
 function buildSubgroupReport(rows, days, rf, gendf, byf, name) {
@@ -679,8 +690,9 @@ function computeRecColWidths(headers, rawRows, fields) {
   if (!fields || !fields.length) return rec;
   fields.forEach(f => {
     if (headers.indexOf(f) < 0) return;
-    // 小組至少 5 個中文字；其他三欄至少 4 個中文字
-    let minForField = MIN_W;
+    // 小組至少 5 個中文字；其他三欄至少 4 個中文字；日期欄（11/16早餐）表頭換行，可窄
+    const isDateCol = /^\d{1,2}\/\d{1,2}/.test(f);
+    let minForField = isDateCol ? 58 : MIN_W;
     if (f === '小組') minForField = 120;
     else if (f === '身分別' || f === '大組' || f === '姓名') minForField = 100;
     const lens = [];
@@ -699,7 +711,12 @@ function computeRecColWidths(headers, rawRows, fields) {
       const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.85));
       base = Math.max(avg, sorted[idx]);
     }
-    const headerUnits = Math.min(estimateTextUnits(f), 20);
+    const headerUnits = isDateCol
+      ? Math.max(
+          estimateTextUnits(f.match(/^\d{1,2}\/\d{1,2}/)[0]),
+          estimateTextUnits(f.replace(/^\d{1,2}\/\d{1,2}\s*/, ''))
+        )
+      : Math.min(estimateTextUnits(f), 20);
     const units = Math.max(base, Math.ceil(headerUnits / 2));
     rec[f] = Math.max(minForField, Math.min(MAX_W, Math.round(units * UNIT_PX + PADDING_PX)));
   });

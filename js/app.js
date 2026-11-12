@@ -164,6 +164,17 @@ async function submitQuery() {
   document.getElementById('resultCount').textContent = `共 ${rows.length} 筆`;
   showSuccess(`已載入 ${rows.length} 筆資料`);
 }
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// 日期欄位表頭換行：11/16早餐 → 11/16 / 早餐
+function formatHeader(f) {
+  const m = String(f).match(/^(\d{1,2}\/\d{1,2})\s*(.*)$/);
+  if (m) {
+    return '<span class="block">' + escHtml(m[1]) + '</span>' + (m[2] ? '<span class="block">' + escHtml(m[2]) + '</span>' : '');
+  }
+  return escHtml(f);
+}
 function renderTable(fields, rows) {
   const table = document.getElementById('dataTable');
   table.classList.add('fixed-cols');
@@ -180,7 +191,12 @@ function renderTable(fields, rows) {
     cg.appendChild(col);
   });
   const tr = document.createElement('tr');
-  fields.forEach(f => { const th = document.createElement('th'); th.textContent = f; th.className = 'px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap border-b border-gray-200'; tr.appendChild(th); });
+  fields.forEach(f => {
+    const th = document.createElement('th');
+    th.innerHTML = formatHeader(f);
+    th.className = 'px-2 py-2 text-xs font-semibold text-gray-700 border-b border-gray-200 leading-tight';
+    tr.appendChild(th);
+  });
   thead.appendChild(tr);
   renderStats(rows);
   rows.forEach(row => {
