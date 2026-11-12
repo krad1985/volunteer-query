@@ -45,26 +45,16 @@ async function init() {
     if (urlAct && activities.some(a=>a.id===urlAct)) sel.value = urlAct;
     sel.addEventListener('change', () => loadActivity(sel.value));
     await loadActivity(sel.value);
-    // URL 參數自動篩選
+    // URL 參數自動篩選（等下拉選項就緒後再設定，避免競態）
     if (urlGroup) {
-      const gSel = document.getElementById('groupSelect');
-      gSel.value = urlGroup;
-      gSel.dispatchEvent(new Event('change'));
-      setTimeout(() => {
-        const sSel = document.getElementById('subgroupSelect');
-        const targetSub = urlSubgroup || '選擇全部';
-        sSel.value = targetSub;
-        sSel.dispatchEvent(new Event('change'));
-        if (urlPwd) document.getElementById('passwordInput').value = urlPwd;
-        setTimeout(() => {
-          const btn = document.getElementById('submitBtn');
-          if (!btn.disabled) btn.click();
-        }, 100);
-      }, 100);
-      // 隱藏篩選控制，只顯示該組內容
-      const filterCard = document.getElementById('filterCard');
-      if (filterCard) filterCard.style.display = 'none';
-      document.getElementById('content').classList.add('compact-mode');
+      const ok = await applyUrlFilters(urlGroup, urlSubgroup, urlPwd);
+      if (ok) {
+        const filterCard = document.getElementById('filterCard');
+        if (filterCard) filterCard.style.display = 'none';
+        document.getElementById('content').classList.add('compact-mode');
+      } else {
+        showError(`找不到大組「${urlGroup}」，請確認網址參數`);
+      }
     }
     // 單位模式：隱藏活動選擇，只顯示該單位活動
     if (unit) {
@@ -128,14 +118,27 @@ async function loadActivity(actId) {
     document.getElementById('submitBtn').disabled = !(groupSel.value === '' || subSel.value);
     document.getElementById('results').classList.add('d-none');
   };
-  const roleSel = document.getElementById('roleSelect');
-  // role values from data not available; keep generic
   document.getElementById('submitBtn').onclick = submitQuery;
   document.getElementById('submitBtn').disabled = true;
-  document.getElementById('subgroupSelect').onchange = () => {
-    document.getElementById('submitBtn').disabled = !document.getElementById('subgroupSelect').value;
-    document.getElementById('results').classList.add('d-none');
-  };
+}
+async function applyUrlFilters(group, subgroup, pwd) {
+  const gSel = document.getElementById('groupSelect');
+  const sSel = document.getElementById('subgroupSelect');
+  const has = (sel, v) => Array.from(sel.options).some(o => o.value === v);
+  if (!has(gSel, group)) return false;
+  gSel.value = group;
+  gSel.dispatchEvent(new Event('change'));
+  // 等小組選項出現（最多 3 秒）
+  for (let i = 0; i < 30 && sSel.options.length <= 1; i++) {
+    await new Promise(r => setTimeout(r, 100));
+  }
+  const target = subgroup && has(sSel, subgroup) ? subgroup : '選擇全部';
+  sSel.value = target;
+  sSel.dispatchEvent(new Event('change'));
+  if (pwd) document.getElementById('passwordInput').value = pwd;
+  document.getElementById('submitBtn').disabled = false;
+  await submitQuery();
+  return true;
 }
 async function submitQuery() {
   const actId = document.getElementById('activitySelect').value;
