@@ -189,8 +189,6 @@ function renderTable(fields, rows) {
       if (h && (h.includes('義工') || h.includes('早餐') || h.includes('午餐') || h.includes('晚餐') || h.includes('住宿'))) {
         td.textContent = String(cell) === '1' ? '☑' : (String(cell)==='0' ? '☐' : '');
         td.classList.add('text-center', 'text-lg', 'text-green-600');
-      } else if (h && (h === '電話' || h.includes('電話'))) {
-        renderPhoneCell(td, cell);
       } else if (h && h.includes('電話') && cell) {
         const phone = String(cell).replace(/[^0-9]/g, '');
         const masked = phone.length >= 8 ? phone.substring(0, 4) + '***' + phone.substring(phone.length - 3) : '***';
