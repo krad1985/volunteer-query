@@ -199,13 +199,26 @@ function renderTable(fields, rows) {
   });
   thead.appendChild(tr);
   renderStats(rows);
+  // 自動判斷 0/1 欄位 → 以 ☑/☐ 呈現（回程、報到等布林欄位也適用）
+  const boolCols = new Set();
+  fields.forEach((f, i) => {
+    if (/電話|姓名|性別|身分別|大組|小組/.test(f)) return;
+    let has = false, allBool = true;
+    for (const row of rows) {
+      const v = String(row[i] ?? '').trim();
+      if (v === '') continue;
+      has = true;
+      if (v !== '0' && v !== '1') { allBool = false; break; }
+    }
+    if (has && allBool) boolCols.add(i);
+  });
   rows.forEach(row => {
     const tr = document.createElement('tr');
     row.forEach((cell, i) => {
       const td = document.createElement('td');
       const h = fields[i];
       td.className = 'px-3 py-2 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap';
-      if (h && (h.includes('義工') || h.includes('早餐') || h.includes('午餐') || h.includes('晚餐') || h.includes('住宿'))) {
+      if (boolCols.has(i)) {
         td.textContent = String(cell) === '1' ? '☑' : (String(cell)==='0' ? '☐' : '');
         td.classList.add('text-center', 'text-lg', 'text-green-600');
       } else if (h && h.includes('電話') && cell) {
