@@ -2,6 +2,7 @@ let adminPassword = '';
 let activities = [];
 let availableFields = [];
 let availableHeaders = [];
+let adminPublicToken = '';
 
 function api(action, params = {}) {
   // 大型資料（如活動設定）改用 POST，避免 GET URL 長度限制
@@ -32,7 +33,102 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnTestConnection').onclick = handleTestConnection;
   document.getElementById('btnSaveActivity').onclick = handleSaveActivity;
   document.getElementById('btnAutoDetect').onclick = autoDetectDays;
+
+  // 統計報表（後台）
+  const reportLoadBtn = document.getElementById('reportLoadBtn');
+  if (reportLoadBtn) reportLoadBtn.onclick = loadAdminReport;
+  document.querySelectorAll('#reportTabs .nav-link').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#reportTabs .nav-link').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (window._lastAdminReport) renderAdminReport(window._lastAdminReport);
+    });
+  });
+  const chkRole = document.getElementById('reportChkRole');
+  const chkGender = document.getElementById('reportChkGender');
+  if (chkRole) chkRole.addEventListener('change', () => { if (window._lastAdminReport) renderAdminReport(window._lastAdminReport); });
+  if (chkGender) chkGender.addEventListener('change', () => { if (window._lastAdminReport) renderAdminReport(window._lastAdminReport); });
 });
+
+let adminReportTab = 'manpower';
+async function loadAdminReport() {
+  const actId = document.getElementById('reportActivitySelect')?.value;
+  if (!actId) { alert('請選擇活動'); return; }
+  const res = await api('getReport', { act: actId, token: adminPublicToken });
+  if (!res.ok) { alert(res.error || '載入報表失敗'); return; }
+  window._lastAdminReport = res;
+  renderAdminReport(res);
+}
+function renderAdminReport(res) {
+  const chkGender = document.getElementById('reportChkGender').checked;
+  const chkRole = document.getElementById('reportChkRole').checked;
+  const tab = document.querySelector('#reportTabs .nav-link.active')?.dataset.tab || 'manpower';
+  let html = '';
+  if (tab === 'manpower') html = renderAdminManpower(res, chkGender, chkRole);
+  else if (tab === 'meals') html = renderAdminMeals(res, chkGender);
+  else html = renderAdminLodging(res, chkGender);
+  document.getElementById('reportContainer').innerHTML = html;
+}
+function renderAdminManpower(res, chkGender, chkRole) {
+  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th><th>總人數</th>';
+  if (chkGender) html += '<th>男</th><th>女</th>';
+  if (chkRole) html += '<th>幹部</th><th>一般義工</th>';
+  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`; html += `<th>${l} 合計</th>`; });
+  html += '</tr></thead><tbody>';
+  res.groups.forEach(g => {
+    g.subgroups.forEach(s => {
+      html += `<tr><td>${g.name}</td><td>${s.name}</td><td>${s.headcount.total}</td>`;
+      if (chkGender) html += `<td>${s.headcount.male}</td><td>${s.headcount.female}</td>`;
+      if (chkRole) html += `<td>${s.headcount.cadre}</td><td>${s.headcount.volunteer}</td>`;
+      s.manpowerByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
+      html += '</tr>';
+    });
+  });
+  html += '<tr class="table-dark"><td colspan="2">總計</td><td>' + res.total.headcount.total + '</td>';
+  if (chkGender) html += `<td>${res.total.headcount.male}</td><td>${res.total.headcount.female}</td>`;
+  if (chkRole) html += `<td>${res.total.headcount.cadre}</td><td>${res.total.headcount.volunteer}</td>`;
+  res.total.manpowerByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
+  html += '</tr></tbody></table>';
+  return html;
+}
+function renderAdminMeals(res, chkGender) {
+  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
+  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 早男</th><th>${l} 早女</th>`; html += `<th>${l} 早計</th>`; if (chkGender) html += `<th>${l} 午男</th><th>${l} 午女</th>`; html += `<th>${l} 午計</th>`; if (chkGender) html += `<th>${l} 晚男</th><th>${l} 晚女</th>`; html += `<th>${l} 晚計</th>`; });
+  html += '</tr></thead><tbody>';
+  res.groups.forEach(g => {
+    g.subgroups.forEach(s => {
+      html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
+      s.mealsByDay.forEach(d => {
+        if (chkGender) html += `<td>${d.breakfast.male}</td><td>${d.breakfast.female}</td>`; html += `<td>${d.breakfast.total}</td>`;
+        if (chkGender) html += `<td>${d.lunch.male}</td><td>${d.lunch.female}</td>`; html += `<td>${d.lunch.total}</td>`;
+        if (chkGender) html += `<td>${d.dinner.male}</td><td>${d.dinner.female}</td>`; html += `<td>${d.dinner.total}</td>`;
+      });
+      html += '</tr>';
+    });
+  });
+  html += '</tbody></table>';
+  return html;
+}
+function renderAdminLodging(res, chkGender) {
+  let html = '<table class="table table-bordered table-sm"><thead><tr><th>大組</th><th>小組</th>';
+  res.dayLabels.forEach(l => { if (chkGender) html += `<th>${l} 男</th><th>${l} 女</th>`; html += `<th>${l} 合計</th>`; });
+  if (chkGender) html += '<th>最大床位(男)</th><th>最大床位(女)</th>';
+  html += '<th>最大床位(合計)</th></tr></thead><tbody>';
+  res.groups.forEach(g => {
+    g.subgroups.forEach(s => {
+      html += `<tr><td>${g.name}</td><td>${s.name}</td>`;
+      s.lodgingByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
+      if (chkGender) html += `<td>${s.maxBed.male}</td><td>${s.maxBed.female}</td>`;
+      html += `<td>${s.maxBed.total}</td></tr>`;
+    });
+  });
+  html += '<tr class="table-dark"><td colspan="2">總計</td>';
+  res.total.lodgingByDay.forEach(d => { if (chkGender) html += `<td>${d.male}</td><td>${d.female}</td>`; html += `<td>${d.total}</td>`; });
+  if (chkGender) html += `<td>${res.total.maxBed.male}</td><td>${res.total.maxBed.female}</td>`;
+  html += `<td>${res.total.maxBed.total}</td></tr>`;
+  html += '</tbody></table>';
+  return html;
+}
 
 async function handleLogin() {
   const pwd = document.getElementById('adminPwd').value.trim();
@@ -50,7 +146,10 @@ async function loadActivities() {
   const res = await api('getConfig', { pwd: adminPassword });
   if (!res.ok) { alert(res.error); return; }
   activities = res.config?.activities || [];
+  adminPublicToken = res.config?.publicToken || '';
   renderActivityList();
+  const rsel = document.getElementById('reportActivitySelect');
+  if (rsel) rsel.innerHTML = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
 }
 
 function renderActivityList() {

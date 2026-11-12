@@ -33,6 +33,31 @@
       </div>
       <ul id="activityList" class="list-group mb-4"></ul>
 
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">統計報表</h5>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-4">
+              <label class="form-label">活動</label>
+              <select id="reportActivitySelect" class="form-select"></select>
+            </div>
+            <div class="col-md-2">
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="reportChkRole"><label class="form-check-label" for="reportChkRole">區分身分</label></div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="reportChkGender"><label class="form-check-label" for="reportChkGender">區分性別</label></div>
+            </div>
+            <div class="col-md-2"><button id="reportLoadBtn" class="btn btn-primary">載入報表</button></div>
+          </div>
+          <ul class="nav nav-tabs" id="reportTabs">
+            <li class="nav-item"><button class="nav-link active" data-tab="manpower">整體人力</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="meals">用餐狀況</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="lodging">住宿狀況</button></li>
+          </ul>
+          <div id="reportContainer" class="mt-3"></div>
+        </div>
+      </div>
+
       <dialog id="activityModal" class="modal-dialog" style="max-width:900px;">
         <div class="modal-content p-3">
           <h4 id="modalTitle">新增活動</h4>

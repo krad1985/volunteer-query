@@ -16,7 +16,7 @@
       載入資料中...
     </div>
     <div id="content" class="d-none">
-      <div class="card mb-4">
+      <div class="card mb-4" id="filterCard">
         <div class="card-body">
           <div class="row g-3 align-items-end">
             <div class="col-md-3">
@@ -53,12 +53,18 @@
               <button id="submitBtn" class="btn btn-primary w-100" disabled>查詢</button>
             </div>
             <div class="col-md-3 text-end">
-              <a href="report.html" class="btn btn-outline-info">統計報表</a>
               <a href="admin.html" class="btn btn-outline-secondary">管理後台</a>
             </div>
           </div>
           <p id="error" class="text-danger mt-2 d-none"></p>
           <p id="success" class="text-muted mt-2 d-none"></p>
+        </div>
+      </div>
+
+      <div id="stats" class="card d-none">
+        <div class="card-body">
+          <h5 class="mb-2">統計摘要</h5>
+          <div class="row text-center" id="statsCards"></div>
         </div>
       </div>
 

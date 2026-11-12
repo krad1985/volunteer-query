@@ -52,18 +52,25 @@ async function init() {
       gSel.dispatchEvent(new Event('change'));
       if (urlSubgroup) {
         const sSel = document.getElementById('subgroupSelect');
-        // wait for options
         setTimeout(() => {
           sSel.value = urlSubgroup;
           sSel.dispatchEvent(new Event('change'));
           if (urlPwd) document.getElementById('passwordInput').value = urlPwd;
-          // auto submit if possible
           setTimeout(() => {
             const btn = document.getElementById('submitBtn');
             if (!btn.disabled) btn.click();
           }, 100);
         }, 100);
       }
+      // 隱藏篩選控制，只顯示該組內容
+      const filterCard = document.getElementById('filterCard');
+      if (filterCard) filterCard.style.display = 'none';
+      document.getElementById('content').classList.add('compact-mode');
+    }
+    // 單位模式：隱藏活動選擇，只顯示該單位活動
+    if (unit) {
+      const actRow = document.getElementById('activitySelect').closest('.col-md-3');
+      if (actRow) actRow.style.display = 'none';
     }
     document.getElementById('loading').classList.add('d-none');
     document.getElementById('content').classList.remove('d-none');
@@ -114,6 +121,8 @@ async function loadActivity(actId) {
       subSel.innerHTML = '<option value="">請選擇小組</option>' +
         subs.map(v => `<option value="${v}">${v === '大組' ? '大組（幹部）' : v}</option>`).join('') +
         '<option value="選擇全部">選擇全部</option>';
+      subSel.value = '選擇全部';
+      document.getElementById('submitBtn').disabled = false;
     }
   };
   subSel.onchange = () => {
@@ -171,6 +180,7 @@ function renderTable(fields, rows) {
   const tr = document.createElement('tr');
   fields.forEach(f => { const th = document.createElement('th'); th.textContent = f; th.className = 'px-3 py-2 text-xs font-semibold text-gray-700 whitespace-nowrap border-b border-gray-200'; tr.appendChild(th); });
   thead.appendChild(tr);
+  renderStats(rows);
   rows.forEach(row => {
     const tr = document.createElement('tr');
     row.forEach((cell, i) => {
@@ -226,6 +236,24 @@ function renderTable(fields, rows) {
     });
     tbody.appendChild(tr);
   });
+}
+function renderStats(rows) {
+  const box = document.getElementById('statsCards');
+  const card = document.getElementById('stats');
+  if (!box) return;
+  if (!rows.length) { card.classList.add('d-none'); return; }
+  card.classList.remove('d-none');
+  const idx = Object.fromEntries(currentFields.map((f,i)=>[f,i]));
+  const total = rows.length;
+  let male=0, female=0, cadre=0, volunteer=0;
+  rows.forEach(r => {
+    const g = String(r[idx['性別']] ?? '').trim();
+    if (g === '男') male++; else if (g === '女') female++;
+    const role = String(r[idx['身分別']] ?? '').trim();
+    if (role === '幹部') cadre++; else volunteer++;
+  });
+  const item = (label, val, color) => `<div class="col"><div class="p-3 rounded-lg bg-${color}-50"><div class="text-2xl font-bold text-${color}-700">${val}</div><div class="text-xs text-gray-500">${label}</div></div></div>`;
+  box.innerHTML = item('總人數', total, 'blue') + item('男', male, 'indigo') + item('女', female, 'pink') + item('幹部', cadre, 'green') + item('一般義工', volunteer, 'amber');
 }
 // 匯出 CSV
 function exportCsv() {
