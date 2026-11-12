@@ -120,7 +120,7 @@ function handleGetActivityInfo(params) {
       birthYearField: activity.birthYearField || '',
       nameField: activity.nameField || '',
       phoneField: activity.phoneField || '',
-      dayMappings: activity.dayMappings || [],
+      dayMappings: normalizeDayMappings(activity.dayMappings || []),
       displayFields: activity.displayFields || [],
       unit: activity.unit || '',
       accessKey: activity.accessKey || ''
@@ -208,10 +208,8 @@ function handleGetReport(params) {
   const rf = activity.roleField;
   const gendf = activity.genderField;
   const byf = activity.birthYearField;
-  // 略過完全空白的日期設定（label 與所有欄位皆空）
-  const days = (activity.dayMappings || []).filter(d => d && (
-    (d.label && String(d.label).trim()) || d.attendanceField || d.breakfastField ||
-    d.lunchField || d.dinnerField || d.lodgingField));
+  // 略過完全空白的日期設定（label 與所有欄位皆空）＋同日合併＋依日期排序
+  const days = normalizeDayMappings(activity.dayMappings || []);
   const dayMeta = days.map(d => ({
     label: d.label,
     attendance: !!d.attendanceField,
@@ -259,6 +257,43 @@ function handleGetReport(params) {
   const grand = buildAggregate(rows, days, rf, gendf, byf);
 
   return { ok: true, name: activity.name, groups, total: grand, dayLabels: days.map(d=>d.label), dayMeta };
+}
+
+const DAY_FIELDS = ['attendanceField', 'breakfastField', 'lunchField', 'dinnerField', 'lodgingField'];
+
+function dayDateKey(label) {
+  const m = String(label || '').match(/^(\d{1,2})\/(\d{1,2})/);
+  return m ? Number(m[1]) * 100 + Number(m[2]) : null;
+}
+
+/**
+ * 日期設定整理：
+ * 1. 移除完全空白的日期
+ * 2. 同一天（8/7 與 8/07）合併欄位；若同欄位指向不同來源則不合併
+ * 3. 全部都是 M/D 格式時依日期排序
+ */
+function normalizeDayMappings(list) {
+  const kept = (list || []).filter(d => d && ((d.label && String(d.label).trim()) || DAY_FIELDS.some(f => d[f])));
+  const out = [];
+  const byKey = {};
+  kept.forEach(d => {
+    const key = dayDateKey(d.label);
+    if (key === null) { out.push(Object.assign({}, d)); return; }
+    const cur = byKey[key];
+    if (!cur) {
+      const o = Object.assign({}, d);
+      byKey[key] = o;
+      out.push(o);
+      return;
+    }
+    const conflict = DAY_FIELDS.some(f => cur[f] && d[f] && cur[f] !== d[f]);
+    if (conflict) { out.push(Object.assign({}, d)); return; }
+    DAY_FIELDS.forEach(f => { if (!cur[f] && d[f]) cur[f] = d[f]; });
+  });
+  if (out.length && out.every(d => dayDateKey(d.label) !== null)) {
+    out.sort((a, b) => dayDateKey(a.label) - dayDateKey(b.label));
+  }
+  return out;
 }
 
 function buildSubgroupReport(rows, days, rf, gendf, byf, name) {
@@ -440,19 +475,24 @@ function handleGetConfig(params) {
     const unit = getUnitById(params.unit);
     if (!unit) return { ok: false, error: '找不到該單位' };
     if (!verifyUnitAdminPassword(unit, params.unitPwd)) return { ok: false, error: '單位管理密碼錯誤' };
-    const activities = getAllActivities().filter(a => a.unit === unit.id);
+    const activities = getAllActivities().filter(a => a.unit === unit.id).map(withNormalizedDays);
     return { ok: true, role: 'unit', unit: { id: unit.id, name: unit.name, token: unit.token || '' },
       config: { activities, units: [{ id: unit.id, name: unit.name, token: unit.token || '' }] } };
   }
   if (!verifyAdminPassword(params.pwd)) return { ok: false, error: '管理密碼錯誤' };
   const index = getConfigIndex();
   const units = index.units.map(id => getUnitById(id)).filter(u=>u);
-  const allActivities = getAllActivities();
+  const allActivities = getAllActivities().map(withNormalizedDays);
   return { ok: true, role: 'admin', config: {
     activities: allActivities,
     units: units.map(u => ({ id: u.id, name: u.name, token: u.token || '', activityCount: allActivities.filter(a=>a.unit===u.id).length })),
     publicToken: index.publicToken || ''
   } };
+}
+
+function withNormalizedDays(a) {
+  if (!a) return a;
+  return Object.assign({}, a, { dayMappings: normalizeDayMappings(a.dayMappings || []) });
 }
 
 function handleCreateUnit(params) {
