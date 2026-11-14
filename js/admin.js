@@ -84,11 +84,18 @@ async function downloadReportImage() {
   const table = el && el.querySelector('table');
   if (!table) { alert('請先載入報表'); return; }
   if (typeof html2canvas === 'undefined') { alert('圖片元件尚未載入，請稍後再試'); return; }
-  const canvas = await html2canvas(table, { backgroundColor: '#ffffff', scale: 2 });
-  const a = document.createElement('a');
-  a.download = '統計報表.png';
-  a.href = canvas.toDataURL('image/png');
-  a.click();
+  const wrap = table.closest('.report-wrap');
+  const prev = wrap ? wrap.style.cssText : '';
+  if (wrap) wrap.style.cssText = 'overflow: visible;';
+  try {
+    const canvas = await html2canvas(table, { backgroundColor: '#ffffff', scale: 2 });
+    const a = document.createElement('a');
+    a.download = '統計報表.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  } finally {
+    if (wrap) wrap.style.cssText = prev;
+  }
 }
 
 let adminReportTab = 'manpower';

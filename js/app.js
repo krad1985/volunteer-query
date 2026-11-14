@@ -337,10 +337,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const table = document.getElementById('dataTable');
     if (!table || !table.querySelector('tbody tr')) { alert('請先查詢資料'); return; }
     if (typeof html2canvas === 'undefined') { alert('圖片元件尚未載入，請稍後再試'); return; }
-    const canvas = await html2canvas(table, { backgroundColor: '#ffffff', scale: 2 });
-    const a = document.createElement('a');
-    a.download = '義工名冊.png';
-    a.href = canvas.toDataURL('image/png');
-    a.click();
+    const wrap = table.closest('.overflow-auto');
+    const prev = wrap ? wrap.style.cssText : '';
+    if (wrap) wrap.style.cssText = 'overflow: visible; max-height: none;';
+    try {
+      const canvas = await html2canvas(table, { backgroundColor: '#ffffff', scale: 2 });
+      const a = document.createElement('a');
+      a.download = '義工名冊.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    } finally {
+      if (wrap) wrap.style.cssText = prev;
+    }
   });
 });

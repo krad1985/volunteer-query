@@ -1,6 +1,6 @@
 body { font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif; }
 .table-container { max-height: 600px; overflow: auto; }
-table.fixed-cols { table-layout: fixed; }
+table.fixed-cols { table-layout: fixed; width: auto; }
 table.fixed-cols tbody td { overflow: hidden; text-overflow: ellipsis; }
 table.fixed-cols thead th { white-space: normal; word-wrap: break-word; }
 .modal-dialog { border: 1px solid #ccc; border-radius: 8px; padding: 0; }
