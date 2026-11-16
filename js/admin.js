@@ -613,7 +613,10 @@ async function loadGroupPasswords() {
   document.body.dataset.gp = 'clicked';
   const actId = document.getElementById('pwdActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
-  const res = await api('getActivityGroups', { act: actId, ...authParams() });
+  document.body.dataset.gp1 = String(actId);
+  let res;
+  try { res = await api('getActivityGroups', { act: actId, ...authParams() }); } catch (e) { document.body.dataset.gpErr = String(e); throw e; }
+  document.body.dataset.gp2 = JSON.stringify(res).slice(0, 120);
   if (!res.ok) { alert(res.error || '載入失敗'); return; }
   window._groupPwdData = res;
   document.getElementById('groupPwdBox').classList.remove('d-none');
