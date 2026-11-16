@@ -753,7 +753,8 @@ function handleSaveActivity(params) {
       const existing = getActivityById(activityData.id);
       if (!existing) return { ok: false, error: '找不到該活動' };
       if (existing.unit !== unit.id) return { ok: false, error: '不可編輯其他單位的活動' };
-      saveActivityRecord(activityData);
+      // _partial update（如代表色、通知單設定）需與現有設定合併，避免整筆覆蓋
+      saveActivityRecord(Object.assign({}, existing, activityData));
     }
     return { ok: true, id: activityData.id };
   }
@@ -768,7 +769,10 @@ function handleSaveActivity(params) {
     saveActivityRecord(activityData);
     const index = getConfigIndex(); index.activityIds.push(activityData.id); saveConfigIndex(index);
   } else {
-    saveActivityRecord(activityData);
+    const existing = getActivityById(activityData.id);
+    if (!existing) return { ok: false, error: '找不到該活動' };
+    // 部分更新（代表色、通知單設定）需與現有設定合併，避免整筆覆蓋
+    saveActivityRecord(Object.assign({}, existing, activityData));
   }
   return { ok: true, id: activityData.id };
 }

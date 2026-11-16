@@ -77,12 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const imgBtn = document.getElementById('reportImgBtn');
   if (imgBtn) imgBtn.onclick = downloadReportImage;
-  document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
-  document.getElementById('reportThemeColor').addEventListener('input', e => {
-    document.querySelectorAll('#reportContainer table.report-table').forEach(t => {
-      t.style.setProperty('--ov-accent', e.target.value);
-    });
-  });
 
   // 組別密碼
   document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
@@ -93,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnPickAll').onclick = () => setNoticePick(true);
   document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
   document.getElementById('noticeGroupFilter').addEventListener('change', renderNoticePick);
-  ['noticeColor', 'noticeShowQr', 'noticeShowBarcode'].forEach(id => {
+  ['noticeShowQr', 'noticeShowBarcode'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderNoticePreview);
   });
   ['noticeRegion', 'noticeClassPrefix', 'noticeReportInfo', 'noticeContactName', 'noticeContactPhone', 'noticeNotices']
@@ -469,6 +463,7 @@ function openModal(actId = null) {
   document.getElementById('actSheetUrl').value = '';
   document.getElementById('actSheetName').value = '';
   document.getElementById('actAccessKey').value = '';
+  document.getElementById('actThemeColor').value = '#3b5b8c';
   document.getElementById('actUnit').value = '';
   document.getElementById('dayMappingsJson').value = '';
   document.getElementById('connectionHint').textContent = '';
@@ -481,6 +476,7 @@ function openModal(actId = null) {
       document.getElementById('actSheetUrl').value = act.sheetUrl || '';
       document.getElementById('actSheetName').value = act.sheetName || '';
       document.getElementById('actAccessKey').value = act.accessKey || '';
+      document.getElementById('actThemeColor').value = act.themeColor || '#3b5b8c';
       document.getElementById('actUnit').value = act.unit || '';
       document.getElementById('dayMappingsJson').value = JSON.stringify(act.dayMappings || [], null, 2);
       // test connection silent
@@ -586,6 +582,7 @@ async function handleSaveActivity() {
     id: document.getElementById('editActivityId').value || undefined,
     name, sheetId, sheetUrl, sheetName: sheetName || undefined, groupField, subgroupField, roleField, genderField,
     birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey,
+    themeColor: document.getElementById('actThemeColor').value || undefined,
     unit: document.getElementById('actUnit').value || undefined
   };
   const res = await api('saveActivity', { ...authParams(), data: JSON.stringify(data) });
@@ -593,19 +590,6 @@ async function handleSaveActivity() {
   alert('儲存成功');
   document.getElementById('activityModal').close();
   await loadActivities();
-}
-
-/* ===== 活動代表色 ===== */
-async function handleSaveTheme() {
-  const actId = document.getElementById('reportActivitySelect').value;
-  const color = document.getElementById('reportThemeColor').value;
-  if (!actId) { alert('請先選擇活動'); return; }
-  const res = await api('saveActivity', {
-    ...authParams(),
-    data: JSON.stringify({ id: actId, themeColor: color })
-  });
-  if (!res.ok) { alert(res.error || '套用失敗'); return; }
-  showOk('themeHint', '已套用代表色 ' + color);
 }
 
 /* ===== 組別密碼 ===== */
@@ -681,7 +665,6 @@ function readNoticeForm() {
     serialDigits: Number(document.getElementById('noticeSerialDigits').value) || 3,
     showQr: document.getElementById('noticeShowQr').checked,
     showBarcode: document.getElementById('noticeShowBarcode').checked,
-    color: document.getElementById('noticeColor').value
   };
 }
 
@@ -697,7 +680,6 @@ function writeNoticeForm(cfg) {
   document.getElementById('noticeSerialDigits').value = cfg.serialDigits || 3;
   document.getElementById('noticeShowQr').checked = cfg.showQr !== false;
   document.getElementById('noticeShowBarcode').checked = cfg.showBarcode !== false;
-  document.getElementById('noticeColor').value = cfg.color || '#3b5b8c';
 }
 
 async function loadNoticeConfig() {
@@ -746,7 +728,6 @@ function noticeEsc(t) {
 }
 
 function noticeSheetHtml(cfg, p) {
-  const color = cfg.color || '#3b5b8c';
   const title = noticeData && noticeData.name ? noticeData.name + ' 義工報到通知單' : '義工報到通知單';
   const meta = [];
   if (cfg.region) meta.push('<span class="meta-line"><strong>區域:</strong>' + noticeEsc(cfg.region) + '</span>');
@@ -760,14 +741,14 @@ function noticeSheetHtml(cfg, p) {
       + (cfg.contactPhone ? ' ' + noticeEsc(cfg.contactPhone) : '') + '</div>'
     : '';
   const qr = cfg.showQr
-    ? '<div class="qr-box"><img alt="QR" data-qr="' + noticeEsc(p.code) + '"><div class="small text-muted">' + noticeEsc(p.code) + '</div></div>'
+    ? '<div class="qr-box"><img alt="QR" data-qr="' + noticeEsc(p.code) + '"><div class="code-text">' + noticeEsc(p.code) + '</div></div>'
     : '';
   const bc = cfg.showBarcode
     ? '<div class="barcode-box"><canvas class="bc-canvas" data-bc="' + noticeEsc(p.code) + '"></canvas></div>'
     : '';
-  return '<div class="notice-sheet" style="--ov-accent:' + color + '">'
+  return '<div class="notice-sheet">'
     + '<h2>' + noticeEsc(title) + '</h2>'
-    + '<div class="code-box"><div>' + meta.join('') + groupLine + '</div>' + qr + '</div>'
+    + '<div class="code-box"><div class="code-main">' + meta.join('') + groupLine + '</div>' + qr + '</div>'
     + '<div class="bar"></div>'
     + (cfg.reportInfo ? '<div>' + noticeEsc(cfg.reportInfo).replace(/\n/g, '<br>') + '</div>' : '')
     + (notices ? '<div class="bar"></div><ol>' + notices + '</ol>' : '')
@@ -810,10 +791,9 @@ async function saveNoticeConfig() {
   const cfg = readNoticeForm();
   const res = await api('saveActivity', {
     ...authParams(),
-    data: JSON.stringify({ id: actId, noticeConfig: cfg, themeColor: cfg.color })
+    data: JSON.stringify({ id: actId, noticeConfig: cfg })
   });
   if (!res.ok) { alert(res.error || '儲存失敗'); return; }
-  if (noticeData) noticeData.themeColor = cfg.color;
   alert('通知單設定已儲存');
 }
 
@@ -823,20 +803,20 @@ function printNoticeSheets() {
     .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
   if (!checked.length) { alert('請至少勾選一人'); return; }
   const cfg = readNoticeForm();
-  const color = cfg.color || '#3b5b8c';
   const sheets = checked.map(p => noticeSheetHtml(cfg, p)).join('');
+  const css = (document.getElementById('noticeStyle') || {}).textContent || '';
   const win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>通知單</title>'
+    + '<style>' + css + '<\/style>'
     + '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>'
-    + '<style>body{font-family:"Microsoft JhengHei",sans-serif;margin:0;padding:12px;background:#fff}'
-    + '.no-print{position:sticky;top:0;background:#fff;padding:8px;text-align:center;border-bottom:1px solid #ccc}'
-    + '.notice-sheet{--ov-accent:' + color + '}</style></head><body>'
-    + '<div class="no-print">共 ' + checked.length + ' 張，請按 Ctrl+P 列印（建議 A4、邊界最小）</div>'
+    + '</head><body>'
+    + '<div class="no-print" style="position:sticky;top:0;background:#fff;padding:8px;text-align:center;border-bottom:1px solid #999">'
+    + '共 ' + checked.length + ' 張，請按 Ctrl+P 列印（A4、邊界 8mm，每頁兩張）</div>'
     + sheets
     + '<script>window.onload=function(){document.querySelectorAll("img[data-qr]").forEach(function(qr){'
-    + 'qr.src="https://api.qrserver.com/v1/create-qr-code/?size=184x184&data="+encodeURIComponent(qr.dataset.qr)});'
+    + 'qr.src="https://api.qrserver.com/v1/create-qr-code/?size=148x148&data="+encodeURIComponent(qr.dataset.qr)});'
     + 'document.querySelectorAll("canvas.bc-canvas").forEach(function(cv){'
-    + 'try{JsBarcode(cv,cv.dataset.bc,{format:"CODE128",displayValue:true,fontSize:16,height:46,margin:0})}catch(e){cv.replaceWith(document.createTextNode(cv.dataset.bc))}});};'
+    + 'try{JsBarcode(cv,cv.dataset.bc,{format:"CODE128",displayValue:true,fontSize:14,height:40,margin:0})}catch(e){cv.replaceWith(document.createTextNode(cv.dataset.bc))}});};'
     + '<\/script></body></html>');
   win.document.close();
 }
