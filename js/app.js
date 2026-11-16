@@ -161,7 +161,7 @@ function overviewUrl(res, group, subgroup) {
 
 function overviewLink(res, group, subgroup, text) {
   return '<a class="ov-link" target="_blank" rel="noopener" href="'
-    + overviewUrl(res, group, subgroup) + '">' + text + ' ›</a>';
+    + overviewUrl(res, group, subgroup) + '">' + text + '</a>';
 }
 
 async function showOverview() {

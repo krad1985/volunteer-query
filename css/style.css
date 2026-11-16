@@ -21,9 +21,9 @@ table.overview-table thead th { background: #eef2f7; color: #334155; font-weight
 table.overview-table td { vertical-align: middle; }
 table.overview-table td.num, table.overview-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.overview-table td.ov-group { background: #eef2f7; font-weight: 600; color: #0f172a; border-right: 1px solid #d7dee8; white-space: nowrap; }
-table.overview-table tbody tr.ov-alt td:not(.ov-group) { background: #fafbfd; }
-table.overview-table tbody tr.ov-sub td { background: #e6edf6; border-top: 2px solid #b8c6d8; }
-table.overview-table tbody tr.ov-sub td.ov-group { background: #dfe7f1; }
+table.overview-table tbody tr.ov-alt td:not(.ov-group) { background: #f6f8fc; }
+table.overview-table tbody tr.ov-sub td { background: #e3ebf5; border-top: 2px solid #a9bacf; }
+table.overview-table tbody tr.ov-sub td.ov-group { background: #dae3ef; }
 table.overview-table tbody tr.ov-total td { background: #1f2937; color: #fff; }
 table.overview-table tbody tr:hover td:not(.ov-group) { background: #e8f0fb; }
 a.ov-link { display: inline-block; padding: 1px 6px; border-radius: 4px; color: #2563eb; text-decoration: none; white-space: nowrap; }
