@@ -243,21 +243,25 @@ function buildOverviewTable(res, opt) {
   window._overviewLinks = [];
 
   let html = '<div class="report-wrap"><table class="table table-bordered table-sm report-table overview-table"><thead><tr>'
-    + '<th>大組</th><th>小組</th><th>總人數</th><th>名單</th></tr></thead><tbody>';
+    + '<th>大組</th><th>小組</th><th class="num">總人數</th><th>名冊</th></tr></thead><tbody>';
 
-  res.groups.forEach(g => {
-    g.subgroups.forEach(sg => {
-      html += '<tr><td class="text-start">' + g.name + '</td><td class="text-start">' + sg.name + '</td>'
-        + '<td class="text-end">' + sg.headcount.total + '</td>';
-      html += linkCell(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '</tr>';
+  res.groups.forEach((g, gi) => {
+    const alt = gi % 2 === 1 ? ' ov-alt' : '';
+    const span = g.subgroups.length + 1;
+    g.subgroups.forEach((sg, si) => {
+      html += '<tr class="ov-row' + alt + '">';
+      if (si === 0) html += '<td class="ov-group" rowspan="' + span + '">' + g.name + '</td>';
+      html += '<td class="text-start">' + sg.name + '</td>'
+        + '<td class="num">' + sg.headcount.total + '</td>'
+        + linkCell(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '</tr>';
     });
-    html += '<tr class="group-sub"><td class="text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>'
-      + '<td class="text-end fw-semibold">' + g.headcount.total + '</td>';
-    html += linkCell(res, g.name, '') + '</tr>';
+    html += '<tr class="ov-sub' + alt + '"><td class="text-start fw-semibold">小計</td>'
+      + '<td class="num fw-semibold">' + g.headcount.total + '</td>'
+      + linkCell(res, g.name, '') + '</tr>';
   });
 
-  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>'
-    + '<td class="text-end">' + res.total.headcount.total + '</td><td></td></tr></tbody></table></div>';
+  html += '<tr class="ov-total"><td colspan="2" class="fw-semibold">總計</td>'
+    + '<td class="num fw-semibold">' + res.total.headcount.total + '</td><td></td></tr></tbody></table></div>';
   return html;
 }
 

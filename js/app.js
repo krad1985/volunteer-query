@@ -159,8 +159,9 @@ function overviewUrl(res, group, subgroup) {
   return 'index.html?' + q.toString();
 }
 
-function overviewCountCells(h) {
-  return '<td class="text-end">' + h.total + '</td>';
+function overviewLink(res, group, subgroup, text) {
+  return '<a class="ov-link" target="_blank" rel="noopener" href="'
+    + overviewUrl(res, group, subgroup) + '">' + text + ' ›</a>';
 }
 
 async function showOverview() {
@@ -176,21 +177,27 @@ async function showOverview() {
     return;
   }
   document.getElementById('overviewActName').textContent = res.name ? '（' + res.name + '）' : '';
-  let html = '<table class="table table-bordered table-sm report-table"><thead><tr>'
-    + '<th>大組</th><th>小組</th><th>總人數</th><th></th>'
+  let html = '<table class="table table-bordered table-sm report-table overview-table"><thead><tr>'
+    + '<th>大組</th><th>小組</th><th class="num">總人數</th><th>名冊</th>'
     + '</tr></thead><tbody>';
-  res.groups.forEach(g => {
-    g.subgroups.forEach(sg => {
-      html += '<tr><td>' + g.name + '</td><td>' + sg.name + '</td>' + overviewCountCells(sg.headcount)
-        + '<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0 px-2" href="'
-        + overviewUrl(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '">查看</a></td></tr>';
+  res.groups.forEach((g, gi) => {
+    const alt = gi % 2 === 1 ? ' ov-alt' : '';
+    const span = g.subgroups.length + 1;
+    g.subgroups.forEach((sg, si) => {
+      html += '<tr class="ov-row' + alt + '">';
+      if (si === 0) html += '<td class="ov-group" rowspan="' + span + '">' + g.name + '</td>';
+      html += '<td>' + sg.name + '</td>'
+        + '<td class="num">' + sg.headcount.total + '</td>'
+        + '<td class="text-nowrap">'
+        + overviewLink(res, g.name, sg.name === '（未分小組）' ? '' : sg.name, '查看')
+        + '</td></tr>';
     });
-    html += '<tr class="group-sub"><td class="fw-semibold">' + g.name + '</td><td class="fw-semibold">小計</td>'
-      + overviewCountCells(g.headcount)
-      + '<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0 px-2" href="'
-      + overviewUrl(res, g.name, '') + '">查看</a></td></tr>';
+    html += '<tr class="ov-sub' + alt + '"><td class="fw-semibold">小計</td>'
+      + '<td class="num fw-semibold">' + g.headcount.total + '</td>'
+      + '<td class="text-nowrap">' + overviewLink(res, g.name, '', '全組') + '</td></tr>';
   });
-  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>' + overviewCountCells(res.total) + '<td></td></tr>';
+  html += '<tr class="ov-total"><td colspan="2" class="fw-semibold">總計</td>'
+    + '<td class="num fw-semibold">' + res.total.total + '</td><td></td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
 }
