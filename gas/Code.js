@@ -9,7 +9,7 @@
 const PROP_ACTIVITIES = 'ACTIVITIES_CONFIG';
 const PROP_ADMIN_HASH = 'ADMIN_PWD_HASH';
 const PROP_ADMIN_SALT = 'ADMIN_PWD_SALT';
-const CACHE_PREFIX = 'VOL_V2_DATA_';
+const CACHE_PREFIX = 'VOL_V3_DATA_';
 const CACHE_TTL = 60;
 
 /* ===== 主進入點 ===== */
@@ -173,6 +173,23 @@ function handleGetList(params) {
   if (group) rows = rows.filter(r => String(r[activity.groupField] ?? '').trim() === group);
   if (subgroup && subgroup !== '選擇全部') rows = rows.filter(r => String(r[activity.subgroupField] ?? '').trim() === subgroup);
 
+  // 排序：小組名稱 → 身分別（幹部 → 義工/一般義工 → 學員）→ 姓名
+  const sf = activity.subgroupField, rf = activity.roleField, nf = activity.nameField;
+  const roleRank = v => {
+    const s = String(v ?? '').trim();
+    if (s === '幹部') return 0;
+    if (s === '義工' || s === '一般義工') return 1;
+    if (s === '學員') return 2;
+    return s ? 3 : 4;
+  };
+  rows = rows.slice().sort((a, b) => {
+    const sa = String(a[sf] ?? '').trim(), sb = String(b[sf] ?? '').trim();
+    if (sa !== sb) return sa.localeCompare(sb, 'zh-TW');
+    const ra = roleRank(a[rf]), rb = roleRank(b[rf]);
+    if (ra !== rb) return ra - rb;
+    return String(a[nf] ?? '').trim().localeCompare(String(b[nf] ?? '').trim(), 'zh-TW');
+  });
+
   const displayFields = (activity.displayFields && activity.displayFields.length) ? activity.displayFields : data.headers;
   const projected = rows.map(row => displayFields.map(f => {
     const i = data.headers.indexOf(f);
@@ -260,7 +277,18 @@ function handleGetReport(params) {
   // grand total
   const grand = buildAggregate(rows, days, rf, gendf, byf);
 
-  return { ok: true, name: activity.name, groups, total: grand, dayLabels: days.map(d=>d.label), dayMeta };
+  return {
+    ok: true,
+    name: activity.name,
+    actId: actId,
+    accessKey: activity.accessKey || '',
+    unitId: activity.unit || '',
+    unitToken: activity.unit ? (getUnitById(activity.unit)?.token || '') : '',
+    groups,
+    total: grand,
+    dayLabels: days.map(d=>d.label),
+    dayMeta
+  };
 }
 
 const DAY_FIELDS = ['attendanceField', 'breakfastField', 'lunchField', 'dinnerField', 'lodgingField'];
