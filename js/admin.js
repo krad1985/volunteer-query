@@ -763,7 +763,7 @@ function noticeSheetHtml(cfg, p) {
     ? '<div class="qr-box"><img alt="QR" data-qr="' + noticeEsc(p.code) + '"><div class="small text-muted">' + noticeEsc(p.code) + '</div></div>'
     : '';
   const bc = cfg.showBarcode
-    ? '<div class="barcode-box"><img alt="barcode" data-bc="' + noticeEsc(p.code) + '"></div>'
+    ? '<div class="barcode-box"><canvas class="bc-canvas" data-bc="' + noticeEsc(p.code) + '"></canvas></div>'
     : '';
   return '<div class="notice-sheet" style="--ov-accent:' + color + '">'
     + '<h2>' + noticeEsc(title) + '</h2>'
@@ -782,7 +782,7 @@ function renderNoticePreview() {
   const cfg = readNoticeForm();
   const checked = Array.from(document.querySelectorAll('.notice-pick:checked'))
     .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
-  const people = checked.length ? checked : noticePeople.slice(0, 1);
+  const people = checked.length ? checked.slice(0, 1) : noticePeople.slice(0, 1);
   box.innerHTML = people.map(p => noticeSheetHtml(cfg, p)).join('');
 }
 
@@ -796,10 +796,11 @@ async function renderNoticeCodes() {
   for (const qr of qrImgs) {
     qr.src = 'https://api.qrserver.com/v1/create-qr-code/?size=184x184&data=' + encodeURIComponent(qr.dataset.qr);
   }
-  const bcImgs = document.querySelectorAll('#noticePreview img[data-bc]');
-  for (const bc of bcImgs) {
-    bc.src = 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(bc.dataset.bc)
-      + '&code=Code128&dpi=96&imagetype=Png&color=Black&bgcolor=White';
+  const canvases = document.querySelectorAll('#noticePreview canvas.bc-canvas');
+  for (const cv of canvases) {
+    try {
+      JsBarcode(cv, cv.dataset.bc, { format: 'CODE128', displayValue: true, fontSize: 16, height: 46, margin: 0 });
+    } catch (e) { cv.replaceWith(document.createTextNode(cv.dataset.bc)); }
   }
 }
 
@@ -826,6 +827,7 @@ function printNoticeSheets() {
   const sheets = checked.map(p => noticeSheetHtml(cfg, p)).join('');
   const win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>通知單</title>'
+    + '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>'
     + '<style>body{font-family:"Microsoft JhengHei",sans-serif;margin:0;padding:12px;background:#fff}'
     + '.no-print{position:sticky;top:0;background:#fff;padding:8px;text-align:center;border-bottom:1px solid #ccc}'
     + '.notice-sheet{--ov-accent:' + color + '}</style></head><body>'
@@ -833,9 +835,8 @@ function printNoticeSheets() {
     + sheets
     + '<script>window.onload=function(){document.querySelectorAll("img[data-qr]").forEach(function(qr){'
     + 'qr.src="https://api.qrserver.com/v1/create-qr-code/?size=184x184&data="+encodeURIComponent(qr.dataset.qr)});'
-    + 'document.querySelectorAll("img[data-bc]").forEach(function(bc){'
-    + 'bc.src="https://barcode.tec-it.com/barcode.ashx?data="+encodeURIComponent(bc.dataset.bc)'
-    + '+"&code=Code128&dpi=96&imagetype=Png&color=Black&bgcolor=White"});};'
-    + '</script></body></html>');
+    + 'document.querySelectorAll("canvas.bc-canvas").forEach(function(cv){'
+    + 'try{JsBarcode(cv,cv.dataset.bc,{format:"CODE128",displayValue:true,fontSize:16,height:46,margin:0})}catch(e){cv.replaceWith(document.createTextNode(cv.dataset.bc))}});};'
+    + '<\/script></body></html>');
   win.document.close();
 }
