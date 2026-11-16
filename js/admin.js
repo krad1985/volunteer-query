@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPublicUnits();
 
   // 單位管理
-  document.body.dataset.m1='1';document.getElementById('btnAddUnit').onclick = () => {
+  document.getElementById('btnAddUnit').onclick = () => {
     document.getElementById('unitForm').classList.remove('d-none');
     document.getElementById('unitName').value = '';
     document.getElementById('unitPwd').value = '';
@@ -50,14 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCancelUnit').onclick = () => document.getElementById('unitForm').classList.add('d-none');
   document.getElementById('btnCreateUnit').onclick = handleCreateUnit;
 
-  document.body.dataset.m2='1';document.getElementById('btnAddActivity').onclick = () => openModal();
+  document.getElementById('btnAddActivity').onclick = () => openModal();
   document.getElementById('btnCloseModal').onclick = () => document.getElementById('activityModal').close();
   document.getElementById('btnTestConnection').onclick = handleTestConnection;
   document.getElementById('btnSaveActivity').onclick = handleSaveActivity;
   document.getElementById('btnAutoDetect').onclick = autoDetectDays;
 
   // 統計報表（後台）
-  document.body.dataset.m3='1';const reportLoadBtn = document.getElementById('reportLoadBtn');
+  const reportLoadBtn = document.getElementById('reportLoadBtn');
   if (reportLoadBtn) reportLoadBtn.onclick = loadAdminReport;
   document.querySelectorAll('#reportTabs .nav-link').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const imgBtn = document.getElementById('reportImgBtn');
   if (imgBtn) imgBtn.onclick = downloadReportImage;
-  document.body.dataset.m4='1';document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
+  document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
   document.getElementById('reportThemeColor').addEventListener('input', e => {
     document.querySelectorAll('#reportContainer table.report-table').forEach(t => {
       t.style.setProperty('--ov-accent', e.target.value);
@@ -85,10 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 組別密碼
-  document.body.dataset.m5='1';document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
+  document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
 
   // 通知單
-  document.body.dataset.m6='1';document.getElementById('btnLoadNoticeCfg').onclick = loadNoticeConfig;
+  document.getElementById('btnLoadNoticeCfg').onclick = loadNoticeConfig;
   document.getElementById('btnNoticeSaveCfg').onclick = saveNoticeConfig;
   document.getElementById('btnPickAll').onclick = () => setNoticePick(true);
   document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
@@ -610,13 +610,9 @@ async function handleSaveTheme() {
 
 /* ===== 組別密碼 ===== */
 async function loadGroupPasswords() {
-  document.body.dataset.gp = 'clicked';
   const actId = document.getElementById('pwdActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
-  document.body.dataset.gp1 = String(actId);
-  let res;
-  try { res = await api('getActivityGroups', { act: actId, ...authParams() }); } catch (e) { document.body.dataset.gpErr = String(e); throw e; }
-  document.body.dataset.gp2 = JSON.stringify(res).slice(0, 120);
+  const res = await api('getActivityGroups', { act: actId, ...authParams() });
   if (!res.ok) { alert(res.error || '載入失敗'); return; }
   window._groupPwdData = res;
   document.getElementById('groupPwdBox').classList.remove('d-none');
@@ -705,7 +701,6 @@ function writeNoticeForm(cfg) {
 }
 
 async function loadNoticeConfig() {
-  document.body.dataset.nc = 'clicked';
   const actId = document.getElementById('noticeActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
   const res = await api('getNoticeData', { act: actId, ...authParams() });
