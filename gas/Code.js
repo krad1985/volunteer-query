@@ -25,6 +25,7 @@ function doGet(e) {
       case 'getActivityInfo': result = handleGetActivityInfo(e.parameter); break;
       case 'getList': result = handleGetList(e.parameter); break;
       case 'getReport': result = handleGetReport(e.parameter); break;
+      case 'getSummary': result = handleGetSummary(e.parameter); break;
       case 'testConnection': result = handleTestConnection(e.parameter); break;
       case 'getCategoryValues': result = handleGetCategoryValues(e.parameter); break;
       case 'admin_login': result = handleAdminLogin(e.parameter); break;
@@ -340,16 +341,69 @@ function isOne(v) {
   return s === '1' || s === '1.0' || s.toLowerCase() === 'true' || s === '是' || s === 'Y' || s === 'y';
 }
 
-function buildAggregate(rows, days, rf, gendf, byf) {
-  const headcount = { total: rows.length, male: 0, female: 0, cadre: 0, volunteer: 0 };
+/* ===== 公開統計總表（只回人數，不含個人資料） ===== */
+function countHeadcount(rows, rf, gendf) {
+  const hc = { total: rows.length, male: 0, female: 0, cadre: 0, volunteer: 0 };
   rows.forEach(r => {
     const gender = String(r[gendf] ?? '').trim();
-    if (gender === '男') headcount.male++;
-    else if (gender === '女') headcount.female++;
+    if (gender === '男') hc.male++;
+    else if (gender === '女') hc.female++;
     const role = String(r[rf] ?? '').trim();
-    if (role === '幹部') headcount.cadre++;
-    else headcount.volunteer++;
+    if (role === '幹部') hc.cadre++;
+    else hc.volunteer++;
   });
+  return hc;
+}
+
+function handleGetSummary(params) {
+  const actId = params.act;
+  if (!actId) return { ok: false, error: '缺少活動 ID' };
+  const activity = getActivityById(actId);
+  if (!activity) return { ok: false, error: '找不到該活動' };
+  const auth = authorizeActivity(params, activity);
+  if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
+
+  const cacheKey = CACHE_PREFIX + 'SUM_' + actId + '_v' + (activity.cacheVersion || 0);
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  const data = readSpreadsheetData(activity);
+  if (!data.ok) return data;
+
+  const gf = activity.groupField, sf = activity.subgroupField;
+  const rf = activity.roleField, gendf = activity.genderField;
+  const map = {};
+  data.rawRows.forEach(row => {
+    const g = String(row[gf] ?? '').trim() || '（未分組）';
+    const s = String(row[sf] ?? '').trim() || '（未分小組）';
+    if (!map[g]) map[g] = {};
+    if (!map[g][s]) map[g][s] = [];
+    map[g][s].push(row);
+  });
+
+  const groups = Object.keys(map).sort((a, b) => a.localeCompare(b, 'zh-TW')).map(g => {
+    const subs = Object.keys(map[g]).sort((a, b) => a.localeCompare(b, 'zh-TW')).map(s => ({
+      name: s,
+      headcount: countHeadcount(map[g][s], rf, gendf)
+    }));
+    const allRows = subs.reduce((acc, sg) => acc.concat(map[g][sg.name]), []);
+    return { name: g, headcount: countHeadcount(allRows, rf, gendf), subgroups: subs };
+  });
+
+  const result = {
+    ok: true,
+    name: activity.name,
+    actId: actId,
+    groups,
+    total: countHeadcount(data.rawRows, rf, gendf)
+  };
+  try { cache.put(cacheKey, JSON.stringify(result), 300); } catch (e) {}
+  return result;
+}
+
+function buildAggregate(rows, days, rf, gendf, byf) {
+  const headcount = countHeadcount(rows, rf, gendf);
 
   const manpowerByDay = days.map(d => {
     const m = { label: d.label, male: 0, female: 0, total: 0 };

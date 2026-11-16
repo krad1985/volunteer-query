@@ -43,14 +43,22 @@ async function init() {
     const sel = document.getElementById('activitySelect');
     sel.innerHTML = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('') || '<option value="">（無活動）</option>';
     if (urlAct && activities.some(a=>a.id===urlAct)) sel.value = urlAct;
-    sel.addEventListener('change', () => loadActivity(sel.value));
+    sel.addEventListener('change', async () => {
+      await loadActivity(sel.value);
+      if (!document.getElementById('overviewCard').classList.contains('d-none')) await showOverview();
+    });
     await loadActivity(sel.value);
+    // 網址指定活動但未指定大組 → 前台預設顯示各組人數總表
+    if (urlAct && !urlGroup) {
+      await showOverview();
+      document.getElementById('filterCard').classList.add('d-none');
+    }
     // URL 參數自動篩選（等下拉選項就緒後再設定，避免競態）
     if (urlGroup) {
       const ok = await applyUrlFilters(urlGroup, urlSubgroup, urlPwd);
       if (ok) {
         const filterCard = document.getElementById('filterCard');
-        if (filterCard) filterCard.style.display = 'none';
+        if (filterCard) filterCard.classList.add('d-none');
         document.getElementById('content').classList.add('compact-mode');
       } else {
         showError(`找不到大組「${urlGroup}」，請確認網址參數`);
@@ -140,6 +148,57 @@ async function applyUrlFilters(group, subgroup, pwd) {
   await submitQuery();
   return true;
 }
+/* ===== 各組人數總表（前台預設） ===== */
+function overviewUrl(res, group, subgroup) {
+  const cur = new URLSearchParams(location.search);
+  const q = new URLSearchParams();
+  q.set('act', res.actId || document.getElementById('activitySelect').value);
+  if (group) q.set('group', group);
+  if (subgroup) q.set('subgroup', subgroup);
+  ['key', 'unit', 'unitToken', 'pwd'].forEach(k => { const v = cur.get(k); if (v) q.set(k, v); });
+  return 'index.html?' + q.toString();
+}
+
+function overviewCountCells(h) {
+  return '<td class="text-end">' + h.total + '</td>'
+    + '<td class="text-end">' + h.male + '</td>'
+    + '<td class="text-end">' + h.female + '</td>'
+    + '<td class="text-end">' + h.cadre + '</td>'
+    + '<td class="text-end">' + h.volunteer + '</td>';
+}
+
+async function showOverview() {
+  const actId = document.getElementById('activitySelect').value;
+  if (!actId) return;
+  const card = document.getElementById('overviewCard');
+  const body = document.getElementById('overviewBody');
+  card.classList.remove('d-none');
+  body.innerHTML = '<p class="text-muted small mb-0">統計中…</p>';
+  const res = await api('getSummary', { act: actId, ...authParams() });
+  if (!res.ok) {
+    body.innerHTML = '<p class="text-danger small mb-0">' + (res.error || '載入統計失敗') + '</p>';
+    return;
+  }
+  document.getElementById('overviewActName').textContent = res.name ? '（' + res.name + '）' : '';
+  let html = '<table class="table table-bordered table-sm report-table"><thead><tr>'
+    + '<th>大組</th><th>小組</th><th>總人數</th><th>男</th><th>女</th><th>幹部</th><th>義工</th><th></th>'
+    + '</tr></thead><tbody>';
+  res.groups.forEach(g => {
+    g.subgroups.forEach(sg => {
+      html += '<tr><td>' + g.name + '</td><td>' + sg.name + '</td>' + overviewCountCells(sg.headcount)
+        + '<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0 px-2" href="'
+        + overviewUrl(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '">查看</a></td></tr>';
+    });
+    html += '<tr class="group-sub"><td class="fw-semibold">' + g.name + '</td><td class="fw-semibold">小計</td>'
+      + overviewCountCells(g.headcount)
+      + '<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0 px-2" href="'
+      + overviewUrl(res, g.name, '') + '">查看</a></td></tr>';
+  });
+  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>' + overviewCountCells(res.total) + '<td></td></tr>';
+  html += '</tbody></table>';
+  body.innerHTML = html;
+}
+
 async function submitQuery() {
   const actId = document.getElementById('activitySelect').value;
   const group = document.getElementById('groupSelect').value;
@@ -333,6 +392,21 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
   document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
   document.getElementById('btnPrintRoster').addEventListener('click', printRoster);
+  document.getElementById('btnShowFilter').addEventListener('click', () => {
+    const card = document.getElementById('filterCard');
+    card.classList.toggle('d-none');
+    if (!card.classList.contains('d-none')) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('btnSaveOverview').addEventListener('click', async () => {
+    const table = document.querySelector('#overviewBody table');
+    if (!table) { alert('尚無統計資料'); return; }
+    if (typeof html2canvas === 'undefined') { alert('圖片元件尚未載入，請稍後再試'); return; }
+    const canvas = await html2canvas(table, { backgroundColor: '#ffffff', scale: 2 });
+    const a = document.createElement('a');
+    a.download = '各組人數總表.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  });
   document.getElementById('btnSaveImage').addEventListener('click', async () => {
     const table = document.getElementById('dataTable');
     if (!table || !table.querySelector('tbody tr')) { alert('請先查詢資料'); return; }
