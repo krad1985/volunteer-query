@@ -610,6 +610,7 @@ async function handleSaveTheme() {
 
 /* ===== 組別密碼 ===== */
 async function loadGroupPasswords() {
+  document.body.dataset.gp = 'clicked';
   const actId = document.getElementById('pwdActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
   const res = await api('getActivityGroups', { act: actId, ...authParams() });
@@ -701,6 +702,7 @@ function writeNoticeForm(cfg) {
 }
 
 async function loadNoticeConfig() {
+  document.body.dataset.nc = 'clicked';
   const actId = document.getElementById('noticeActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
   const res = await api('getNoticeData', { act: actId, ...authParams() });
