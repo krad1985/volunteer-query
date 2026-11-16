@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPublicUnits();
 
   // 單位管理
-  document.getElementById('btnAddUnit').onclick = () => {
+  document.body.dataset.m1='1';document.getElementById('btnAddUnit').onclick = () => {
     document.getElementById('unitForm').classList.remove('d-none');
     document.getElementById('unitName').value = '';
     document.getElementById('unitPwd').value = '';
@@ -50,14 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnCancelUnit').onclick = () => document.getElementById('unitForm').classList.add('d-none');
   document.getElementById('btnCreateUnit').onclick = handleCreateUnit;
 
-  document.getElementById('btnAddActivity').onclick = () => openModal();
+  document.body.dataset.m2='1';document.getElementById('btnAddActivity').onclick = () => openModal();
   document.getElementById('btnCloseModal').onclick = () => document.getElementById('activityModal').close();
   document.getElementById('btnTestConnection').onclick = handleTestConnection;
   document.getElementById('btnSaveActivity').onclick = handleSaveActivity;
   document.getElementById('btnAutoDetect').onclick = autoDetectDays;
 
   // 統計報表（後台）
-  const reportLoadBtn = document.getElementById('reportLoadBtn');
+  document.body.dataset.m3='1';const reportLoadBtn = document.getElementById('reportLoadBtn');
   if (reportLoadBtn) reportLoadBtn.onclick = loadAdminReport;
   document.querySelectorAll('#reportTabs .nav-link').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const imgBtn = document.getElementById('reportImgBtn');
   if (imgBtn) imgBtn.onclick = downloadReportImage;
-  document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
+  document.body.dataset.m4='1';document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
   document.getElementById('reportThemeColor').addEventListener('input', e => {
     document.querySelectorAll('#reportContainer table.report-table').forEach(t => {
       t.style.setProperty('--ov-accent', e.target.value);
@@ -85,10 +85,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // 組別密碼
-  document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
+  document.body.dataset.m5='1';document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
 
   // 通知單
-  document.getElementById('btnLoadNoticeCfg').onclick = loadNoticeConfig;
+  document.body.dataset.m6='1';document.getElementById('btnLoadNoticeCfg').onclick = loadNoticeConfig;
   document.getElementById('btnNoticeSaveCfg').onclick = saveNoticeConfig;
   document.getElementById('btnPickAll').onclick = () => setNoticePick(true);
   document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
