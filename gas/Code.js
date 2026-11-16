@@ -9,7 +9,7 @@
 const PROP_ACTIVITIES = 'ACTIVITIES_CONFIG';
 const PROP_ADMIN_HASH = 'ADMIN_PWD_HASH';
 const PROP_ADMIN_SALT = 'ADMIN_PWD_SALT';
-const CACHE_PREFIX = 'VOL_V3_DATA_';
+const CACHE_PREFIX = 'VOL_V4_DATA_';
 const CACHE_TTL = 60;
 
 /* ===== 主進入點 ===== */
@@ -80,6 +80,17 @@ function authorizeActivity(params, activity) {
   return { ok: true };
 }
 
+/**
+ * 表單填錯的資料：大組與小組填了同一個值（例如兩欄都填「是」），
+ * 這類資料不納入名單、統計與下拉選項。
+ */
+function isNoiseRow(row, gf, sf) {
+  if (!gf || !sf) return false;
+  const g = String(row[gf] ?? '').trim();
+  const s = String(row[sf] ?? '').trim();
+  return !!g && g === s;
+}
+
 function handleGetActivityInfo(params) {
   const actId = params.act;
   if (!actId) return { ok: false, error: '缺少活動 ID' };
@@ -96,9 +107,10 @@ function handleGetActivityInfo(params) {
   if (!data.ok) return data;
   const gf = activity.groupField;
   const sf = activity.subgroupField;
+  const rows = data.rawRows.filter(r => !isNoiseRow(r, gf, sf));
   // 依大組分組的小組清單
   const subgroupsByGroup = {};
-  data.rawRows.forEach(r => {
+  rows.forEach(r => {
     const g = String(r[gf] ?? '').trim() || '（未分組）';
     const s = String(r[sf] ?? '').trim() || '（未分小組）';
     if (!subgroupsByGroup[g]) subgroupsByGroup[g] = {};
@@ -127,10 +139,10 @@ function handleGetActivityInfo(params) {
       accessKey: activity.accessKey || ''
     },
     headers: data.headers,
-    groupValues: uniqueValues(data.rawRows, activity.groupField),
-    subgroupValues: uniqueValues(data.rawRows, activity.subgroupField),
+    groupValues: uniqueValues(rows, activity.groupField),
+    subgroupValues: uniqueValues(rows, activity.subgroupField),
     subgroupsByGroup: subgroupsByGroupArr,
-    recColWidths: computeRecColWidths(data.headers, data.rawRows, displayFields)
+    recColWidths: computeRecColWidths(data.headers, rows, displayFields)
   };
 }
 
@@ -170,7 +182,7 @@ function handleGetList(params) {
   const data = readSpreadsheetData(activity);
   if (!data.ok) return data;
 
-  let rows = data.rawRows;
+  let rows = data.rawRows.filter(r => !isNoiseRow(r, activity.groupField, activity.subgroupField));
   if (group) rows = rows.filter(r => String(r[activity.groupField] ?? '').trim() === group);
   if (subgroup && subgroup !== '選擇全部') rows = rows.filter(r => String(r[activity.subgroupField] ?? '').trim() === subgroup);
 
@@ -244,7 +256,7 @@ function handleGetReport(params) {
   // 過濾（可選）
   const filterGroup = params.group || '';
   const filterSubgroup = params.subgroup || '';
-  let rows = data.rawRows;
+  let rows = data.rawRows.filter(r => !isNoiseRow(r, gf, sf));
   if (filterGroup) rows = rows.filter(r => String(r[gf] ?? '').trim() === filterGroup);
   if (filterSubgroup) rows = rows.filter(r => String(r[sf] ?? '').trim() === filterSubgroup);
 
@@ -374,7 +386,7 @@ function handleGetSummary(params) {
   const gf = activity.groupField, sf = activity.subgroupField;
   const rf = activity.roleField, gendf = activity.genderField;
   const map = {};
-  data.rawRows.forEach(row => {
+  data.rawRows.filter(r => !isNoiseRow(r, gf, sf)).forEach(row => {
     const g = String(row[gf] ?? '').trim() || '（未分組）';
     const s = String(row[sf] ?? '').trim() || '（未分小組）';
     if (!map[g]) map[g] = {};
@@ -396,7 +408,7 @@ function handleGetSummary(params) {
     name: activity.name,
     actId: actId,
     groups,
-    total: countHeadcount(data.rawRows, rf, gendf)
+    total: countHeadcount(data.rawRows.filter(r => !isNoiseRow(r, gf, sf)), rf, gendf)
   };
   try { cache.put(cacheKey, JSON.stringify(result), 300); } catch (e) {}
   return result;

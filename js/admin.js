@@ -241,29 +241,23 @@ function copyQueryLink(i) {
 
 function buildOverviewTable(res, opt) {
   window._overviewLinks = [];
-  const cols = [{ label: '總人數', get: o => o.headcount.total }];
-  if (opt.gender) cols.push({ label: '男', get: o => o.headcount.male }, { label: '女', get: o => o.headcount.female });
-  if (opt.role) cols.push({ label: '幹部', get: o => o.headcount.cadre }, { label: '一般義工', get: o => o.headcount.volunteer });
 
   let html = '<div class="report-wrap"><table class="table table-bordered table-sm report-table overview-table"><thead><tr>'
-    + '<th>大組</th><th>小組</th>';
-  cols.forEach(c => { html += '<th>' + c.label + '</th>'; });
-  html += '<th>名單</th></tr></thead><tbody>';
+    + '<th>大組</th><th>小組</th><th>總人數</th><th>名單</th></tr></thead><tbody>';
 
   res.groups.forEach(g => {
     g.subgroups.forEach(sg => {
-      html += '<tr><td class="text-start">' + g.name + '</td><td class="text-start">' + sg.name + '</td>';
-      cols.forEach(c => { html += cellHtml(c, c.get(sg)); });
+      html += '<tr><td class="text-start">' + g.name + '</td><td class="text-start">' + sg.name + '</td>'
+        + '<td class="text-end">' + sg.headcount.total + '</td>';
       html += linkCell(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '</tr>';
     });
-    html += '<tr class="group-sub"><td class="text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>';
-    cols.forEach(c => { html += cellHtml(c, c.get(g)); });
+    html += '<tr class="group-sub"><td class="text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>'
+      + '<td class="text-end fw-semibold">' + g.headcount.total + '</td>';
     html += linkCell(res, g.name, '') + '</tr>';
   });
 
-  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>';
-  cols.forEach(c => { html += cellHtml(c, c.get(res.total)); });
-  html += '<td></td></tr></tbody></table></div>';
+  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>'
+    + '<td class="text-end">' + res.total.headcount.total + '</td><td></td></tr></tbody></table></div>';
   return html;
 }
 

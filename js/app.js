@@ -160,11 +160,7 @@ function overviewUrl(res, group, subgroup) {
 }
 
 function overviewCountCells(h) {
-  return '<td class="text-end">' + h.total + '</td>'
-    + '<td class="text-end">' + h.male + '</td>'
-    + '<td class="text-end">' + h.female + '</td>'
-    + '<td class="text-end">' + h.cadre + '</td>'
-    + '<td class="text-end">' + h.volunteer + '</td>';
+  return '<td class="text-end">' + h.total + '</td>';
 }
 
 async function showOverview() {
@@ -181,7 +177,7 @@ async function showOverview() {
   }
   document.getElementById('overviewActName').textContent = res.name ? '（' + res.name + '）' : '';
   let html = '<table class="table table-bordered table-sm report-table"><thead><tr>'
-    + '<th>大組</th><th>小組</th><th>總人數</th><th>男</th><th>女</th><th>幹部</th><th>義工</th><th></th>'
+    + '<th>大組</th><th>小組</th><th>總人數</th><th></th>'
     + '</tr></thead><tbody>';
   res.groups.forEach(g => {
     g.subgroups.forEach(sg => {
