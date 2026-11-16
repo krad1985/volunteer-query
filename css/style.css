@@ -16,4 +16,5 @@ table.report-table th { white-space: normal; padding: 0.25rem 0.4rem; line-heigh
 table.report-table td { padding: 0.2rem 0.4rem; white-space: nowrap; }
 table.report-table th.sub-col, table.report-table td.sub-col { background: #f1f5f9; }
 table.report-table tr.group-sub td { background: #f8fafc; border-top: 1px solid #cbd5e1; }
+table.overview-table th { white-space: nowrap; }
 .report-wrap { overflow-x: auto; display: block; }
