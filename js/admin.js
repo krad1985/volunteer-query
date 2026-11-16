@@ -87,9 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnPickAll').onclick = () => setNoticePick(true);
   document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
   document.getElementById('noticeGroupFilter').addEventListener('change', renderNoticePick);
-  ['noticeShowQr', 'noticeShowBarcode'].forEach(id => {
-    document.getElementById(id).addEventListener('change', renderNoticePreview);
-  });
+  document.getElementById('noticeCodeType').addEventListener('change', renderNoticePreview);
   ['noticeRegion', 'noticeClassPrefix', 'noticeReportInfo', 'noticeContactName', 'noticeContactPhone', 'noticeNotices']
     .forEach(id => document.getElementById(id).addEventListener('input', renderNoticePreview));
   document.getElementById('btnNoticePrint').onclick = printNoticeSheets;
@@ -663,8 +661,7 @@ function readNoticeForm() {
     notices: document.getElementById('noticeNotices').value.split('\n').map(x => x.trim()).filter(Boolean),
     serialStart: Number(document.getElementById('noticeSerialStart').value) || 1,
     serialDigits: Number(document.getElementById('noticeSerialDigits').value) || 3,
-    showQr: document.getElementById('noticeShowQr').checked,
-    showBarcode: document.getElementById('noticeShowBarcode').checked,
+    codeType: document.getElementById('noticeCodeType').value
   };
 }
 
@@ -678,8 +675,8 @@ function writeNoticeForm(cfg) {
   document.getElementById('noticeNotices').value = (cfg.notices || []).join('\n');
   document.getElementById('noticeSerialStart').value = cfg.serialStart || 1;
   document.getElementById('noticeSerialDigits').value = cfg.serialDigits || 3;
-  document.getElementById('noticeShowQr').checked = cfg.showQr !== false;
-  document.getElementById('noticeShowBarcode').checked = cfg.showBarcode !== false;
+  const ct = cfg.codeType || (cfg.showBarcode ? 'barcode' : (cfg.showQr === false ? 'none' : 'qr'));
+  document.getElementById('noticeCodeType').value = ct;
 }
 
 async function loadNoticeConfig() {
@@ -740,20 +737,33 @@ function noticeSheetHtml(cfg, p) {
     ? '<div class="contact">若有其他問題請聯絡報到組：' + noticeEsc(cfg.contactName)
       + (cfg.contactPhone ? ' ' + noticeEsc(cfg.contactPhone) : '') + '</div>'
     : '';
-  const qr = cfg.showQr
-    ? '<div class="qr-box"><img alt="QR" data-qr="' + noticeEsc(p.code) + '"><div class="code-text">' + noticeEsc(p.code) + '</div></div>'
+
+  let codeHtml = '';
+  if (cfg.codeType === 'qr') {
+    codeHtml = '<div class="notice-code"><img alt="QR" data-qr="' + noticeEsc(p.code) + '">'
+      + '<div class="code-text">' + noticeEsc(p.code) + '</div></div>';
+  } else if (cfg.codeType === 'barcode') {
+    codeHtml = '<div class="notice-code"><div class="code-text">' + noticeEsc(p.code) + '</div>'
+      + '<canvas class="bc-canvas" data-bc="' + noticeEsc(p.code) + '"></canvas></div>';
+  }
+
+  const reportBlock = cfg.reportInfo
+    ? '<div class="notice-block"><div class="blk-title">報到資訊</div>'
+      + '<div>' + noticeEsc(cfg.reportInfo).replace(/\n/g, '<br>') + '</div></div>'
     : '';
-  const bc = cfg.showBarcode
-    ? '<div class="barcode-box"><canvas class="bc-canvas" data-bc="' + noticeEsc(p.code) + '"></canvas></div>'
+  const noticeBlock = notices
+    ? '<div class="notice-block"><div class="blk-title">注意事項</div><ol class="notice-ol">' + notices + '</ol></div>'
     : '';
+
   return '<div class="notice-sheet">'
-    + '<h2>' + noticeEsc(title) + '</h2>'
-    + '<div class="code-box"><div class="code-main">' + meta.join('') + groupLine + '</div>' + qr + '</div>'
-    + '<div class="bar"></div>'
-    + (cfg.reportInfo ? '<div>' + noticeEsc(cfg.reportInfo).replace(/\n/g, '<br>') + '</div>' : '')
-    + (notices ? '<div class="bar"></div><ol>' + notices + '</ol>' : '')
+    + '<div class="notice-head"><h2>' + noticeEsc(title) + '</h2><div class="head-sub">義 工 報 到 通 知 單</div></div>'
+    + '<div class="notice-body">'
+    + '<div class="notice-row"><div class="notice-main notice-meta">' + meta.join('') + groupLine + '</div>' + codeHtml + '</div>'
+    + reportBlock
+    + noticeBlock
     + contact
-    + bc
+    + '</div>'
+    + '<div class="notice-foot">隨喜您發心參加護持法人事業　敬祝您福慧增長</div>'
     + '</div>';
 }
 

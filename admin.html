@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>管理後台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261117a">
+  <link rel="stylesheet" href="css/style.css?v=20261117b">
 </head>
 <body class="bg-light">
   <div class="container py-4">
@@ -131,9 +131,14 @@
               <select id="noticeActivitySelect" class="form-select"></select>
             </div>
             <div class="col-md-2"><button id="btnLoadNoticeCfg" class="btn btn-primary">載入通知單</button></div>
-            <div class="col-md-2">
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="noticeShowQr" checked><label class="form-check-label" for="noticeShowQr">QR Code</label></div>
-              <div class="form-check"><input class="form-check-input" type="checkbox" id="noticeShowBarcode" checked><label class="form-check-label" for="noticeShowBarcode">條碼</label></div>
+            <div class="col-md-3">
+              <label class="form-label">報到編號圖碼</label>
+              <select id="noticeCodeType" class="form-select">
+                <option value="none">不使用</option>
+                <option value="qr" selected>QR Code</option>
+                <option value="barcode">條碼</option>
+              </select>
+              <div class="form-text">QR 或條碼擇一使用</div>
             </div>
             <div class="col-md-3 text-end">
               <button id="btnNoticePrint" class="btn btn-success">預覽並列印</button>
@@ -263,7 +268,8 @@
 
   <style id="noticeStyle">
     /* ===== 通知單（黑白，A4 每頁兩張） ===== */
-    .notice-print-area { background: #eef1f5; padding: 10px; border-radius: 6px; }
+    .notice-print-area { background: #e9edf2; padding: 12px; border-radius: 6px; }
+    /* 背景紋理：細斜紋＋淡灰圓印，列印時仍以 print-color-adjust 保留 */
     .notice-sheet {
       position: relative;
       width: 100%;
@@ -271,10 +277,13 @@
       height: 132mm;
       box-sizing: border-box;
       margin: 0 auto 10px;
-      padding: 9mm 11mm;
-      background: #fff;
+      padding: 8mm 10mm;
+      background-color: #fff;
+      background-image:
+        radial-gradient(circle at 88% 12%, rgba(0,0,0,0.045) 0 22mm, rgba(0,0,0,0) 22.5mm),
+        repeating-linear-gradient(45deg, rgba(0,0,0,0.022) 0, rgba(0,0,0,0.022) 1px, rgba(0,0,0,0) 1px, rgba(0,0,0,0) 9px);
       color: #000;
-      border: 1.5px solid #000;
+      border: 2px solid #000;
       overflow: hidden;
       font-size: 9.5pt;
       line-height: 1.45;
@@ -282,39 +291,69 @@
       break-after: page;
     }
     .notice-sheet:last-child { page-break-after: auto; break-after: auto; }
-    .notice-sheet h2 {
-      text-align: center;
+    .notice-sheet::before {
+      content: "";
+      position: absolute;
+      left: 6mm; right: 6mm; bottom: 5mm;
+      border-top: 1px solid #000;
+      pointer-events: none;
+    }
+    .notice-sheet::after {
+      content: "";
+      position: absolute;
+      left: 6mm; right: 6mm; bottom: 8mm;
+      border-top: 3px double #000;
+      pointer-events: none;
+    }
+    .notice-head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 7px; }
+    .notice-head h2 {
       font-size: 15pt;
       font-weight: 700;
       color: #000;
-      border-bottom: 1.5px solid #000;
-      padding-bottom: 4px;
-      margin: 0 0 6px;
+      margin: 0 0 3px;
+      letter-spacing: 1px;
     }
-    .notice-sheet .code-box { display: flex; gap: 10px; align-items: flex-start; }
-    .notice-sheet .code-box .code-main { flex: 1 1 auto; min-width: 0; }
-    .notice-sheet .meta-line { margin-bottom: 2px; }
-    .notice-sheet .meta-line strong { font-weight: 700; }
-    .notice-sheet .bar { border-top: 1px dashed #000; margin: 6px 0; }
-    .notice-sheet ol { padding-left: 20px; margin: 4px 0; }
-    .notice-sheet ol li { margin-bottom: 2px; }
-    .notice-sheet .contact { margin-top: 6px; text-align: right; font-weight: 700; }
-    .notice-sheet .qr-box { flex: 0 0 78px; width: 78px; text-align: center; }
-    .notice-sheet .qr-box img { width: 74px; height: 74px; display: block; margin: 0 auto; }
-    .notice-sheet .qr-box .code-text { font-size: 8.5pt; margin-top: 2px; word-break: break-all; }
-    .notice-sheet .barcode-box { margin-top: 6px; text-align: right; }
-    .notice-sheet .barcode-box canvas { height: 40px; }
+    .notice-head .head-sub { font-size: 8.5pt; color: #333; letter-spacing: 2px; }
+    .notice-body { position: relative; z-index: 1; }
+    .notice-row { display: flex; gap: 10px; align-items: flex-start; }
+    .notice-main { flex: 1 1 auto; min-width: 0; }
+    .notice-code { flex: 0 0 78px; width: 78px; text-align: center; }
+    .notice-code img { width: 72px; height: 72px; display: block; margin: 0 auto; border: 1px solid #000; padding: 2px; background: #fff; }
+    .notice-code .code-text { font-size: 8.5pt; margin-top: 2px; word-break: break-all; font-weight: 700; }
+    .notice-block {
+      border: 1px solid #000;
+      background: rgba(0,0,0,0.035);
+      padding: 5px 8px;
+      margin: 6px 0;
+    }
+    .notice-block .blk-title {
+      font-weight: 700;
+      border-bottom: 1px solid #000;
+      margin-bottom: 3px;
+      padding-bottom: 1px;
+      letter-spacing: 1px;
+    }
+    .notice-block.plain { background: transparent; }
+    .notice-meta { font-size: 10pt; }
+    .notice-meta .meta-line { margin-bottom: 2px; }
+    .notice-meta .meta-line strong { font-weight: 700; }
+    .notice-ol { padding-left: 20px; margin: 2px 0; }
+    .notice-ol li { margin-bottom: 2px; }
+    .notice-contact { margin-top: 6px; text-align: right; font-weight: 700; }
+    .notice-barcode { margin-top: 6px; text-align: right; }
+    .notice-barcode canvas { height: 38px; background: #fff; }
+    .notice-foot { margin-top: 4px; text-align: center; font-size: 8pt; color: #333; letter-spacing: 1px; }
     @page { size: A4; margin: 8mm; }
     @media print {
       html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .notice-print-area { background: #fff !important; padding: 0 !important; }
       .no-print { display: none !important; }
-      .notice-sheet { margin: 0; border: 1.5px solid #000 !important; }
+      .notice-sheet { margin: 0; }
     }
   </style>
 
-  <script src="js/config.js?v=20261117a"></script>
-  <script src="js/admin.js?v=20261117a"></script>
+  <script src="js/config.js?v=20261117b"></script>
+  <script src="js/admin.js?v=20261117b"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </body>
