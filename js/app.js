@@ -184,9 +184,10 @@ async function showOverview() {
     const alt = gi % 2 === 1 ? ' ov-alt' : '';
     const span = g.subgroups.length + 1;
     g.subgroups.forEach((sg, si) => {
+      const subLabel = sg.name === '（未分小組）' ? '' : sg.name;
       html += '<tr class="ov-row' + alt + '">';
       if (si === 0) html += '<td class="ov-group" rowspan="' + span + '">' + g.name + '</td>';
-      html += '<td>' + sg.name + '</td>'
+      html += '<td>' + subLabel + '</td>'
         + '<td class="num">' + sg.headcount.total + '</td>'
         + '<td class="text-nowrap">'
         + overviewLink(res, g.name, sg.name, '查看')
@@ -200,6 +201,9 @@ async function showOverview() {
     + '<td class="num fw-semibold">' + res.total.total + '</td><td></td></tr>';
   html += '</tbody></table>';
   body.innerHTML = html;
+  const accent = res.themeColor || '#3b5b8c';
+  const tbl = body.querySelector('table.report-table');
+  if (tbl) tbl.style.setProperty('--ov-accent', accent);
 }
 
 async function submitQuery() {
@@ -236,6 +240,10 @@ function formatHeader(f) {
     return '<span class="block">' + escHtml(m[1]) + '</span>' + (m[2] ? '<span class="block">' + escHtml(m[2]) + '</span>' : '');
   }
   return escHtml(f);
+}
+function isFaintValue(v) {
+  const s = String(v ?? '').trim();
+  return ['否', '不參加', '未參加', '無', '沒有', '不出席', '0', 'false', 'FALSE', 'No', 'NO'].indexOf(s) >= 0;
 }
 function renderTable(fields, rows) {
   const table = document.getElementById('dataTable');
@@ -281,8 +289,11 @@ function renderTable(fields, rows) {
       const h = fields[i];
       td.className = 'px-3 py-2 text-sm text-gray-700 border-b border-gray-100 whitespace-nowrap';
       if (boolCols.has(i)) {
-        td.textContent = String(cell) === '1' ? '☑' : (String(cell)==='0' ? '☐' : '');
-        td.classList.add('text-center', 'text-lg', 'text-green-600');
+        const raw = String(cell).trim();
+        td.textContent = raw === '1' ? '☑' : (raw === '0' ? '☐' : '');
+        td.classList.add('text-center', 'text-lg');
+        if (raw === '1') td.classList.add('text-green-600');
+        else td.classList.add('text-gray-400');
       } else if (h && h.includes('電話') && cell) {
         const phone = String(cell).replace(/[^0-9]/g, '');
         const masked = phone.length >= 8 ? phone.substring(0, 4) + '***' + phone.substring(phone.length - 3) : '***';
@@ -322,6 +333,10 @@ function renderTable(fields, rows) {
         td.addEventListener('contextmenu', e => e.preventDefault());
       } else {
         td.textContent = cell ?? '';
+        if (isFaintValue(cell)) {
+          td.classList.remove('text-gray-700');
+          td.classList.add('text-gray-300');
+        }
       }
       tr.appendChild(td);
     });

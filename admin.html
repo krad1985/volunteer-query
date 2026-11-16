@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>管理後台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261116h">
+  <link rel="stylesheet" href="css/style.css?v=20261116i">
 </head>
 <body class="bg-light">
   <div class="container py-4">
@@ -89,6 +89,14 @@
             <div class="col-md-2"><button id="reportLoadBtn" class="btn btn-primary">載入報表</button></div>
             <div class="col-md-2"><button id="reportImgBtn" class="btn btn-outline-secondary">下載表格圖片</button></div>
           </div>
+          <div class="row g-2 align-items-end mt-2">
+            <div class="col-md-3">
+              <label class="form-label mb-0">活動代表色（套用於總表與通知單）</label>
+              <input type="color" id="reportThemeColor" class="form-control form-control-color" value="#3b5b8c">
+            </div>
+            <div class="col-md-2"><button id="btnSaveTheme" class="btn btn-sm btn-outline-primary">套用代表色</button></div>
+            <div class="col-md-7"><span id="themeHint" class="small text-muted"></span></div>
+          </div>
           <ul class="nav nav-tabs" id="reportTabs">
             <li class="nav-item"><button class="nav-link active" data-tab="manpower">整體人力</button></li>
             <li class="nav-item"><button class="nav-link" data-tab="meals">用餐狀況</button></li>
@@ -96,6 +104,110 @@
             <li class="nav-item"><button class="nav-link" data-tab="overview">總表</button></li>
           </ul>
           <div id="reportContainer" class="mt-3"></div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">組別密碼</h5>
+          <p class="small text-muted mb-2">可針對大組或個別小組設定查詢密碼。設定後，使用者查詢該組時需輸入密碼。</p>
+          <div class="row g-2 align-items-end mb-2">
+            <div class="col-md-3">
+              <label class="form-label">活動</label>
+              <select id="pwdActivitySelect" class="form-select"></select>
+            </div>
+            <div class="col-md-2"><button id="btnLoadGroups" class="btn btn-primary">載入組別</button></div>
+          </div>
+          <div id="groupPwdBox" class="d-none">
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle mb-0">
+                <thead><tr><th>大組／小組</th><th>類型</th><th>密碼</th><th style="width:220px;">操作</th></tr></thead>
+                <tbody id="groupPwdBody"></tbody>
+              </table>
+            </div>
+            <p class="small text-muted mt-2 mb-0">「大組」列的密碼會套用到該大組底下所有小組。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="mb-3">通知單套印</h5>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-3">
+              <label class="form-label">活動</label>
+              <select id="noticeActivitySelect" class="form-select"></select>
+            </div>
+            <div class="col-md-2"><button id="btnLoadNoticeCfg" class="btn btn-primary">載入通知單</button></div>
+            <div class="col-md-2">
+              <label class="form-label">代表色</label>
+              <input type="color" id="noticeColor" class="form-control form-control-color" value="#3b5b8c">
+            </div>
+            <div class="col-md-2">
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="noticeShowQr" checked><label class="form-check-label" for="noticeShowQr">QR Code</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="noticeShowBarcode" checked><label class="form-check-label" for="noticeShowBarcode">條碼</label></div>
+            </div>
+            <div class="col-md-3 text-end">
+              <button id="btnNoticePrint" class="btn btn-success">預覽並列印</button>
+              <button id="btnNoticeSaveCfg" class="btn btn-outline-secondary">儲存設定</button>
+            </div>
+          </div>
+
+          <div id="noticeCfgBox" class="d-none">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <label class="form-label">區域</label>
+                <input type="text" id="noticeRegion" class="form-control" placeholder="例如：嘉義">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">班別（編號前綴）</label>
+                <input type="text" id="noticeClassPrefix" class="form-control" placeholder="例如：嘉16宗">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">流水號起始</label>
+                <input type="number" id="noticeSerialStart" class="form-control" value="1" min="1">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">流水號位數</label>
+                <input type="number" id="noticeSerialDigits" class="form-control" value="3" min="1" max="6">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">報到資訊</label>
+                <textarea id="noticeReportInfo" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">聯絡窗口</label>
+                <div class="row g-2">
+                  <div class="col"><input type="text" id="noticeContactName" class="form-control" placeholder="姓名"></div>
+                  <div class="col"><input type="text" id="noticeContactPhone" class="form-control" placeholder="電話"></div>
+                </div>
+              </div>
+              <div class="col-md-12">
+                <label class="form-label">注意事項（每行一則）</label>
+                <textarea id="noticeNotices" class="form-control" rows="8"></textarea>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+              <h6 class="mb-0">套印名單</h6>
+              <div>
+                <button id="btnPickAll" class="btn btn-sm btn-outline-secondary">全選</button>
+                <button id="btnPickNone" class="btn btn-sm btn-outline-secondary">全不選</button>
+                <span id="pickCount" class="small text-muted ms-2"></span>
+              </div>
+            </div>
+            <div class="mb-2">
+              <select id="noticeGroupFilter" class="form-select form-select-sm" style="max-width:260px;">
+                <option value="">全部大組</option>
+              </select>
+            </div>
+            <div id="noticePickBox" class="border rounded p-2" style="max-height:320px;overflow:auto;"></div>
+
+            <div class="mt-3">
+              <h6>預覽</h6>
+              <div id="noticePreview" class="notice-print-area border rounded p-3 bg-light"></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -157,8 +269,8 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20261116h"></script>
-  <script src="js/admin.js?v=20261116h"></script>
+  <script src="js/config.js?v=20261116i"></script>
+  <script src="js/admin.js?v=20261116i"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </body>
 </html>

@@ -77,6 +77,28 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   const imgBtn = document.getElementById('reportImgBtn');
   if (imgBtn) imgBtn.onclick = downloadReportImage;
+  document.getElementById('btnSaveTheme').onclick = handleSaveTheme;
+  document.getElementById('reportThemeColor').addEventListener('input', e => {
+    document.querySelectorAll('#reportContainer table.report-table').forEach(t => {
+      t.style.setProperty('--ov-accent', e.target.value);
+    });
+  });
+
+  // 組別密碼
+  document.getElementById('btnLoadGroups').onclick = loadGroupPasswords;
+
+  // 通知單
+  document.getElementById('btnLoadNoticeCfg').onclick = loadNoticeConfig;
+  document.getElementById('btnNoticeSaveCfg').onclick = saveNoticeConfig;
+  document.getElementById('btnPickAll').onclick = () => setNoticePick(true);
+  document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
+  document.getElementById('noticeGroupFilter').addEventListener('change', renderNoticePick);
+  ['noticeColor', 'noticeShowQr', 'noticeShowBarcode'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderNoticePreview);
+  });
+  ['noticeRegion', 'noticeClassPrefix', 'noticeReportInfo', 'noticeContactName', 'noticeContactPhone', 'noticeNotices']
+    .forEach(id => document.getElementById(id).addEventListener('input', renderNoticePreview));
+  document.getElementById('btnNoticePrint').onclick = printNoticeSheets;
 });
 
 async function downloadReportImage() {
@@ -122,11 +144,22 @@ function renderAdminReport(res) {
   else if (tab === 'lodging') html = buildLodgingTable(res, meta, opt);
   else html = buildOverviewTable(res, opt);
   document.getElementById('reportContainer').innerHTML = html;
+  const accent = res.themeColor || '#3b5b8c';
+  document.querySelectorAll('#reportContainer table.report-table').forEach(t => {
+    t.style.setProperty('--ov-accent', accent);
+  });
+  const picker = document.getElementById('reportThemeColor');
+  if (picker && res.themeColor) picker.value = res.themeColor;
 }
 
 // 日期欄表頭：日期一行、項目一行，節省欄寬
 function dayHead(label, sub) {
   return '<span class="d-block">' + (label || '') + '</span>' + (sub ? '<span class="d-block text-muted small">' + sub + '</span>' : '');
+}
+
+// 小組留空的資料不顯示「（未分小組）」字樣，保持空白
+function subLabel(name) {
+  return name === '（未分小組）' ? '' : name;
 }
 
 function cellHtml(col, value) {
@@ -139,19 +172,20 @@ function buildReportTable(groups, columns, total, opt) {
   let html = '<div class="report-wrap"><table class="table table-bordered table-sm report-table"><thead><tr><th>大組</th><th>小組</th>';
   columns.forEach(c => { html += '<th>' + c.label + '</th>'; });
   html += '</tr></thead><tbody>';
-  groups.forEach(g => {
+  groups.forEach((g, gi) => {
+    const alt = gi % 2 === 1 ? ' ov-alt' : '';
     g.subgroups.forEach(sg => {
-      html += '<tr><td class="text-start">' + g.name + '</td><td class="text-start">' + sg.name + '</td>';
+      html += '<tr class="ov-row' + alt + '"><td class="ov-group text-start">' + g.name + '</td><td class="text-start">' + subLabel(sg.name) + '</td>';
       columns.forEach(c => { html += cellHtml(c, c.get(sg)); });
       html += '</tr>';
     });
     if (opt.groupSub) {
-      html += '<tr class="group-sub"><td class="text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>';
+      html += '<tr class="ov-sub"><td class="ov-group text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>';
       columns.forEach(c => { html += cellHtml(c, c.get(g)); });
       html += '</tr>';
     }
   });
-  html += '<tr class="table-dark fw-semibold"><td colspan="2">總計</td>';
+  html += '<tr class="ov-total"><td colspan="2">總計</td>';
   columns.forEach(c => { html += cellHtml(c, c.get(total)); });
   html += '</tr></tbody></table></div>';
   return html;
@@ -249,9 +283,10 @@ function buildOverviewTable(res, opt) {
     const alt = gi % 2 === 1 ? ' ov-alt' : '';
     const span = g.subgroups.length + 1;
     g.subgroups.forEach((sg, si) => {
+      const subLabel = sg.name === '（未分小組）' ? '' : sg.name;
       html += '<tr class="ov-row' + alt + '">';
       if (si === 0) html += '<td class="ov-group" rowspan="' + span + '">' + g.name + '</td>';
-      html += '<td class="text-start">' + sg.name + '</td>'
+      html += '<td class="text-start">' + subLabel + '</td>'
         + '<td class="num">' + sg.headcount.total + '</td>'
         + linkCell(res, g.name, sg.name) + '</tr>';
     });
@@ -316,6 +351,11 @@ async function loadActivities() {
     asel.innerHTML = '<option value="">（不分單位）</option>' +
       units.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
   }
+  const optHtml = activities.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const psel = document.getElementById('pwdActivitySelect');
+  if (psel) psel.innerHTML = optHtml;
+  const nsel = document.getElementById('noticeActivitySelect');
+  if (nsel) nsel.innerHTML = optHtml;
 }
 
 function renderUnits() {
@@ -553,4 +593,249 @@ async function handleSaveActivity() {
   alert('儲存成功');
   document.getElementById('activityModal').close();
   await loadActivities();
+}
+
+/* ===== 活動代表色 ===== */
+async function handleSaveTheme() {
+  const actId = document.getElementById('reportActivitySelect').value;
+  const color = document.getElementById('reportThemeColor').value;
+  if (!actId) { alert('請先選擇活動'); return; }
+  const res = await api('saveActivity', {
+    ...authParams(),
+    data: JSON.stringify({ id: actId, themeColor: color })
+  });
+  if (!res.ok) { alert(res.error || '套用失敗'); return; }
+  showOk('themeHint', '已套用代表色 ' + color);
+}
+
+/* ===== 組別密碼 ===== */
+async function loadGroupPasswords() {
+  const actId = document.getElementById('pwdActivitySelect').value;
+  if (!actId) { alert('請選擇活動'); return; }
+  const res = await api('getActivityGroups', { act: actId, ...authParams() });
+  if (!res.ok) { alert(res.error || '載入失敗'); return; }
+  window._groupPwdData = res;
+  document.getElementById('groupPwdBox').classList.remove('d-none');
+  renderGroupPasswords();
+}
+
+function renderGroupPasswords() {
+  const res = window._groupPwdData;
+  if (!res) return;
+  const prot = res.protectedCategories || {};
+  const tbody = document.getElementById('groupPwdBody');
+  const esc = t => String(t ?? '').replace(/'/g, "\\'");
+  let html = '';
+  res.groups.forEach(g => {
+    const pw = prot[g.name] || '';
+    html += '<tr><td><strong>' + g.name + '</strong></td><td>大組</td>'
+      + '<td><code class="user-select-all">' + (pw || '<span class="text-muted">（未設定）</span>') + '</code></td>'
+      + '<td>'
+      + '<button class="btn btn-sm btn-outline-primary" onclick="genGroupPwd(\'' + esc(g.name) + '\')">產生</button> '
+      + (pw ? '<button class="btn btn-sm btn-outline-danger" onclick="clearGroupPwd(\'' + esc(g.name) + '\')">清除</button>' : '')
+      + '</td></tr>';
+    g.subgroups.forEach(sg => {
+      const spw = prot[sg] || '';
+      html += '<tr><td class="ps-4">' + sg + '</td><td>小組</td>'
+        + '<td><code class="user-select-all">' + (spw || '<span class="text-muted">（未設定）</span>') + '</code></td>'
+        + '<td>'
+        + '<button class="btn btn-sm btn-outline-primary" onclick="genGroupPwd(\'' + esc(sg) + '\')">產生</button> '
+        + (spw ? '<button class="btn btn-sm btn-outline-danger" onclick="clearGroupPwd(\'' + esc(sg) + '\')">清除</button>' : '')
+        + '</td></tr>';
+    });
+  });
+  tbody.innerHTML = html;
+}
+
+async function genGroupPwd(cat) {
+  const actId = document.getElementById('pwdActivitySelect').value;
+  const res = await api('generateCategoryPassword', { act: actId, cat, ...authParams() });
+  if (!res.ok) { alert(res.error || '產生失敗'); return; }
+  window._groupPwdData.protectedCategories[cat] = res.password;
+  renderGroupPasswords();
+  alert('已為「' + cat + '」產生密碼：' + res.password);
+}
+
+async function clearGroupPwd(cat) {
+  const actId = document.getElementById('pwdActivitySelect').value;
+  if (!confirm('確定清除「' + cat + '」的密碼？')) return;
+  const res = await api('clearCategoryPassword', { act: actId, cat, ...authParams() });
+  if (!res.ok) { alert(res.error || '清除失敗'); return; }
+  delete window._groupPwdData.protectedCategories[cat];
+  renderGroupPasswords();
+}
+
+/* ===== 通知單 ===== */
+let noticePeople = [];
+let noticeData = null;
+
+function readNoticeForm() {
+  return {
+    region: document.getElementById('noticeRegion').value.trim(),
+    classPrefix: document.getElementById('noticeClassPrefix').value.trim(),
+    reportInfo: document.getElementById('noticeReportInfo').value,
+    contactName: document.getElementById('noticeContactName').value.trim(),
+    contactPhone: document.getElementById('noticeContactPhone').value.trim(),
+    notices: document.getElementById('noticeNotices').value.split('\n').map(x => x.trim()).filter(Boolean),
+    serialStart: Number(document.getElementById('noticeSerialStart').value) || 1,
+    serialDigits: Number(document.getElementById('noticeSerialDigits').value) || 3,
+    showQr: document.getElementById('noticeShowQr').checked,
+    showBarcode: document.getElementById('noticeShowBarcode').checked,
+    color: document.getElementById('noticeColor').value
+  };
+}
+
+function writeNoticeForm(cfg) {
+  if (!cfg) return;
+  document.getElementById('noticeRegion').value = cfg.region || '';
+  document.getElementById('noticeClassPrefix').value = cfg.classPrefix || '';
+  document.getElementById('noticeReportInfo').value = cfg.reportInfo || '';
+  document.getElementById('noticeContactName').value = cfg.contactName || '';
+  document.getElementById('noticeContactPhone').value = cfg.contactPhone || '';
+  document.getElementById('noticeNotices').value = (cfg.notices || []).join('\n');
+  document.getElementById('noticeSerialStart').value = cfg.serialStart || 1;
+  document.getElementById('noticeSerialDigits').value = cfg.serialDigits || 3;
+  document.getElementById('noticeShowQr').checked = cfg.showQr !== false;
+  document.getElementById('noticeShowBarcode').checked = cfg.showBarcode !== false;
+  document.getElementById('noticeColor').value = cfg.color || '#3b5b8c';
+}
+
+async function loadNoticeConfig() {
+  const actId = document.getElementById('noticeActivitySelect').value;
+  if (!actId) { alert('請選擇活動'); return; }
+  const res = await api('getNoticeData', { act: actId, ...authParams() });
+  if (!res.ok) { alert(res.error || '載入失敗'); return; }
+  noticeData = res;
+  noticePeople = res.people || [];
+  document.getElementById('noticeCfgBox').classList.remove('d-none');
+  writeNoticeForm(Object.assign({}, res.noticeConfig, { color: res.themeColor || '#3b5b8c' }));
+  const gsel = document.getElementById('noticeGroupFilter');
+  gsel.innerHTML = '<option value="">全部大組</option>' +
+    (res.groups || []).map(g => '<option value="' + g + '">' + g + '</option>').join('');
+  renderNoticePick();
+  renderNoticePreviewWithCodes();
+}
+
+function renderNoticePick() {
+  const box = document.getElementById('noticePickBox');
+  if (!box) return;
+  const filter = document.getElementById('noticeGroupFilter').value;
+  const list = noticePeople.filter(p => !filter || p.group === filter);
+  box.innerHTML = list.map(p => {
+    const idx = noticePeople.indexOf(p);
+    return '<div class="notice-pick-item"><label><input type="checkbox" class="notice-pick" data-idx="' + idx + '" checked>'
+      + '<span class="small">' + p.group + ' / ' + (p.subgroup || '—') + ' / ' + p.name + '（' + p.code + '）</span></label></div>';
+  }).join('');
+  box.querySelectorAll('.notice-pick').forEach(cb => cb.addEventListener('change', updatePickCount));
+  updatePickCount();
+}
+
+function setNoticePick(checked) {
+  document.querySelectorAll('.notice-pick').forEach(cb => { cb.checked = checked; });
+  updatePickCount();
+}
+
+function updatePickCount() {
+  const total = document.querySelectorAll('.notice-pick').length;
+  const picked = document.querySelectorAll('.notice-pick:checked').length;
+  document.getElementById('pickCount').textContent = picked + ' / ' + total + ' 人';
+}
+
+function noticeEsc(t) {
+  return String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function noticeSheetHtml(cfg, p) {
+  const color = cfg.color || '#3b5b8c';
+  const title = noticeData && noticeData.name ? noticeData.name + ' 義工報到通知單' : '義工報到通知單';
+  const meta = [];
+  if (cfg.region) meta.push('<span class="meta-line"><strong>區域:</strong>' + noticeEsc(cfg.region) + '</span>');
+  if (cfg.classPrefix) meta.push('<span class="meta-line"><strong>班別:</strong>' + noticeEsc(cfg.classPrefix) + '</span>');
+  meta.push('<span class="meta-line"><strong>姓名:</strong>' + noticeEsc(p.name) + '</span>');
+  const groupLine = '<div class="meta-line"><strong>您所屬的組別為:</strong>' + noticeEsc(p.group)
+    + (p.subgroup ? ' <strong>小組:</strong>' + noticeEsc(p.subgroup) : '') + '</div>';
+  const notices = cfg.notices.map(n => '<li>' + noticeEsc(n) + '</li>').join('');
+  const contact = (cfg.contactName || cfg.contactPhone)
+    ? '<div class="contact">若有其他問題請聯絡報到組：' + noticeEsc(cfg.contactName)
+      + (cfg.contactPhone ? ' ' + noticeEsc(cfg.contactPhone) : '') + '</div>'
+    : '';
+  const qr = cfg.showQr
+    ? '<div class="qr-box"><img alt="QR" data-qr="' + noticeEsc(p.code) + '"><div class="small text-muted">' + noticeEsc(p.code) + '</div></div>'
+    : '';
+  const bc = cfg.showBarcode
+    ? '<div class="barcode-box"><img alt="barcode" data-bc="' + noticeEsc(p.code) + '"></div>'
+    : '';
+  return '<div class="notice-sheet" style="--ov-accent:' + color + '">'
+    + '<h2>' + noticeEsc(title) + '</h2>'
+    + '<div class="code-box"><div>' + meta.join('') + groupLine + '</div>' + qr + '</div>'
+    + '<div class="bar"></div>'
+    + (cfg.reportInfo ? '<div>' + noticeEsc(cfg.reportInfo).replace(/\n/g, '<br>') + '</div>' : '')
+    + (notices ? '<div class="bar"></div><ol>' + notices + '</ol>' : '')
+    + contact
+    + bc
+    + '</div>';
+}
+
+function renderNoticePreview() {
+  const box = document.getElementById('noticePreview');
+  if (!box || !noticeData) return;
+  const cfg = readNoticeForm();
+  const checked = Array.from(document.querySelectorAll('.notice-pick:checked'))
+    .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
+  const people = checked.length ? checked : noticePeople.slice(0, 1);
+  box.innerHTML = people.map(p => noticeSheetHtml(cfg, p)).join('');
+}
+
+async function renderNoticePreviewWithCodes() {
+  renderNoticePreview();
+  await renderNoticeCodes();
+}
+
+async function renderNoticeCodes() {
+  const qrImgs = document.querySelectorAll('#noticePreview img[data-qr]');
+  for (const qr of qrImgs) {
+    qr.src = 'https://api.qrserver.com/v1/create-qr-code/?size=184x184&data=' + encodeURIComponent(qr.dataset.qr);
+  }
+  const bcImgs = document.querySelectorAll('#noticePreview img[data-bc]');
+  for (const bc of bcImgs) {
+    bc.src = 'https://barcode.tec-it.com/barcode.ashx?data=' + encodeURIComponent(bc.dataset.bc)
+      + '&code=Code128&dpi=96&imagetype=Png&color=Black&bgcolor=White';
+  }
+}
+
+async function saveNoticeConfig() {
+  const actId = document.getElementById('noticeActivitySelect').value;
+  if (!actId) { alert('請先選擇活動'); return; }
+  const cfg = readNoticeForm();
+  const res = await api('saveActivity', {
+    ...authParams(),
+    data: JSON.stringify({ id: actId, noticeConfig: cfg, themeColor: cfg.color })
+  });
+  if (!res.ok) { alert(res.error || '儲存失敗'); return; }
+  if (noticeData) noticeData.themeColor = cfg.color;
+  alert('通知單設定已儲存');
+}
+
+function printNoticeSheets() {
+  if (!noticePeople.length) { alert('尚無名單'); return; }
+  const checked = Array.from(document.querySelectorAll('.notice-pick:checked'))
+    .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
+  if (!checked.length) { alert('請至少勾選一人'); return; }
+  const cfg = readNoticeForm();
+  const color = cfg.color || '#3b5b8c';
+  const sheets = checked.map(p => noticeSheetHtml(cfg, p)).join('');
+  const win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>通知單</title>'
+    + '<style>body{font-family:"Microsoft JhengHei",sans-serif;margin:0;padding:12px;background:#fff}'
+    + '.no-print{position:sticky;top:0;background:#fff;padding:8px;text-align:center;border-bottom:1px solid #ccc}'
+    + '.notice-sheet{--ov-accent:' + color + '}</style></head><body>'
+    + '<div class="no-print">共 ' + checked.length + ' 張，請按 Ctrl+P 列印（建議 A4、邊界最小）</div>'
+    + sheets
+    + '<script>window.onload=function(){document.querySelectorAll("img[data-qr]").forEach(function(qr){'
+    + 'qr.src="https://api.qrserver.com/v1/create-qr-code/?size=184x184&data="+encodeURIComponent(qr.dataset.qr)});'
+    + 'document.querySelectorAll("img[data-bc]").forEach(function(bc){'
+    + 'bc.src="https://barcode.tec-it.com/barcode.ashx?data="+encodeURIComponent(bc.dataset.bc)'
+    + '+"&code=Code128&dpi=96&imagetype=Png&color=Black&bgcolor=White"});};'
+    + '</script></body></html>');
+  win.document.close();
 }

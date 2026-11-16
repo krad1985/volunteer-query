@@ -26,6 +26,8 @@ function doGet(e) {
       case 'getList': result = handleGetList(e.parameter); break;
       case 'getReport': result = handleGetReport(e.parameter); break;
       case 'getSummary': result = handleGetSummary(e.parameter); break;
+      case 'getNoticeData': result = handleGetNoticeData(e.parameter); break;
+      case 'getActivityGroups': result = handleGetActivityGroups(e.parameter); break;
       case 'testConnection': result = handleTestConnection(e.parameter); break;
       case 'getCategoryValues': result = handleGetCategoryValues(e.parameter); break;
       case 'admin_login': result = handleAdminLogin(e.parameter); break;
@@ -35,6 +37,7 @@ function doGet(e) {
       case 'saveActivity': result = handleSaveActivity(e.parameter); break;
       case 'deleteActivity': result = handleDeleteActivity(e.parameter); break;
       case 'generateCategoryPassword': result = handleGenerateCategoryPassword(e.parameter); break;
+      case 'clearCategoryPassword': result = handleClearCategoryPassword(e.parameter); break;
       case 'changePassword': result = handleChangePassword(e.parameter); break;
       case 'createUnit': result = handleCreateUnit(e.parameter); break;
       case 'listUnits': result = handleListUnits(e.parameter); break;
@@ -317,6 +320,7 @@ function handleGetReport(params) {
     accessKey: activity.accessKey || '',
     unitId: activity.unit || '',
     unitToken: activity.unit ? (getUnitById(activity.unit)?.token || '') : '',
+    themeColor: activity.themeColor || '',
     groups,
     total: grand,
     dayLabels: days.map(d=>d.label),
@@ -427,11 +431,90 @@ function handleGetSummary(params) {
     ok: true,
     name: activity.name,
     actId: actId,
+    themeColor: activity.themeColor || '',
     groups,
     total: countHeadcount(data.rawRows.filter(r => !isNoiseRow(r, gf)), rf, gendf)
   };
   try { cache.put(cacheKey, JSON.stringify(result), 300); } catch (e) {}
   return result;
+}
+
+/* ===== 通知單套印資料 ===== */
+function sortRosterRows(rows, sf, rf, nf) {
+  const roleRank = v => {
+    const s = String(v ?? '').trim();
+    if (s === '幹部') return 0;
+    if (s === '義工' || s === '一般義工') return 1;
+    if (s === '學員') return 2;
+    return s ? 3 : 4;
+  };
+  return rows.slice().sort((a, b) => {
+    const sa = String(a[sf] ?? '').trim(), sb = String(b[sf] ?? '').trim();
+    if (sa !== sb) return sa.localeCompare(sb, 'zh-TW');
+    const ra = roleRank(a[rf]), rb = roleRank(b[rf]);
+    if (ra !== rb) return ra - rb;
+    return String(a[nf] ?? '').trim().localeCompare(String(b[nf] ?? '').trim(), 'zh-TW');
+  });
+}
+
+function handleGetNoticeData(params) {
+  const actId = params.act;
+  if (!actId) return { ok: false, error: '缺少活動 ID' };
+  const activity = getActivityById(actId);
+  if (!activity) return { ok: false, error: '找不到該活動' };
+  const auth = resolveAdminAuth(params);
+  if (!auth) return { ok: false, error: '管理密碼錯誤' };
+  if (auth.role === 'unit' && activity.unit !== auth.unit.id) return { ok: false, error: '不可查看其他單位的活動' };
+
+  const data = readSpreadsheetData(activity);
+  if (!data.ok) return data;
+
+  const gf = activity.groupField, sf = activity.subgroupField;
+  const nf = activity.nameField, rf = activity.roleField;
+  let rows = data.rawRows.filter(r => !isNoiseRow(r, gf));
+
+  // 依大組批次篩選（逗號分隔）
+  const groupFilter = String(params.group || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (groupFilter.length) {
+    rows = rows.filter(r => groupFilter.indexOf(String(r[gf] ?? '').trim()) >= 0);
+  }
+
+  rows = sortRosterRows(rows, sf, rf, nf);
+
+  const nc = Object.assign({
+    region: '', classPrefix: '', reportInfo: '', notices: [],
+    contactName: '', contactPhone: '', serialStart: 1, serialDigits: 3,
+    showBarcode: true, showQr: true
+  }, activity.noticeConfig || {});
+
+  const digits = Math.max(1, Math.min(6, Number(nc.serialDigits) || 3));
+  const start = Number(nc.serialStart) || 1;
+  const numField = data.headers.filter(h => h === '編號')[0] || data.headers.filter(h => String(h).includes('編號'))[0] || '';
+
+  const people = rows.map((r, i) => {
+    const rawNum = numField ? String(r[numField] ?? '').trim() : '';
+    const autoCode = String(nc.classPrefix || '') + String(start + i).padStart(digits, '0');
+    return {
+      name: String(r[nf] ?? '').trim(),
+      group: String(r[gf] ?? '').trim() || '（未分組）',
+      subgroup: String(r[sf] ?? '').trim(),
+      role: String(r[rf] ?? '').trim(),
+      code: rawNum || autoCode,
+      fromSheet: !!rawNum,
+      autoCode: autoCode,
+      serial: start + i
+    };
+  });
+
+  return {
+    ok: true,
+    name: activity.name,
+    numField: numField,
+    themeColor: activity.themeColor || '',
+    noticeConfig: nc,
+    groups: uniqueValues(rows, gf),
+    people: people
+  };
 }
 
 function buildAggregate(rows, days, rf, gendf, byf) {
@@ -709,18 +792,21 @@ function handleDeleteActivity(params) {
   return { ok: true };
 }
 
+/* 活動設定編輯權限：總管理員或該單位管理員 */
+function authorizeActivityEdit(params, activity) {
+  if (params.unit && params.unitPwd) {
+    const unit = getUnitById(params.unit);
+    if (!unit || !verifyUnitAdminPassword(unit, params.unitPwd)) return false;
+    return activity.unit === unit.id;
+  }
+  return verifyAdminPassword(params.pwd);
+}
+
 function handleGenerateCategoryPassword(params) {
   const actId = params.act; const cat = params.cat;
   if (!actId || !cat) return { ok: false, error: '缺少活動或分類' };
   const activity = getActivityById(actId); if (!activity) return { ok: false, error: '找不到該活動' };
-  if (params.unit && params.unitPwd) {
-    const unit = getUnitById(params.unit);
-    if (!unit) return { ok: false, error: '找不到該單位' };
-    if (!verifyUnitAdminPassword(unit, params.unitPwd)) return { ok: false, error: '單位管理密碼錯誤' };
-    if (activity.unit !== unit.id) return { ok: false, error: '不可編輯其他單位的活動' };
-  } else if (!verifyAdminPassword(params.pwd)) {
-    return { ok: false, error: '管理密碼錯誤' };
-  }
+  if (!authorizeActivityEdit(params, activity)) return { ok: false, error: '管理密碼錯誤' };
   activity.protectedCategories = activity.protectedCategories || {};
   const password = generateCategoryPassword();
   activity.protectedCategories[cat] = password;
@@ -728,6 +814,44 @@ function handleGenerateCategoryPassword(params) {
   saveActivityRecord(activity);
   return { ok: true, password, cat };
 }
+
+function handleClearCategoryPassword(params) {
+  const actId = params.act; const cat = params.cat;
+  if (!actId || !cat) return { ok: false, error: '缺少活動或分類' };
+  const activity = getActivityById(actId); if (!activity) return { ok: false, error: '找不到該活動' };
+  if (!authorizeActivityEdit(params, activity)) return { ok: false, error: '管理密碼錯誤' };
+  activity.protectedCategories = activity.protectedCategories || {};
+  delete activity.protectedCategories[cat];
+  activity.cacheVersion = (activity.cacheVersion || 0) + 1;
+  saveActivityRecord(activity);
+  return { ok: true, cat };
+}
+
+/* 列出活動的大組／小組，以及已設定的密碼 */
+function handleGetActivityGroups(params) {
+  const actId = params.act;
+  if (!actId) return { ok: false, error: '缺少活動 ID' };
+  const activity = getActivityById(actId);
+  if (!activity) return { ok: false, error: '找不到該活動' };
+  const auth = resolveAdminAuth(params);
+  if (!auth) return { ok: false, error: '管理密碼錯誤' };
+  if (auth.role === 'unit' && activity.unit !== auth.unit.id) return { ok: false, error: '不可查看其他單位的活動' };
+  const data = readSpreadsheetData(activity);
+  if (!data.ok) return data;
+  const gf = activity.groupField, sf = activity.subgroupField;
+  const rows = data.rawRows.filter(r => !isNoiseRow(r, gf));
+  const map = {};
+  rows.forEach(r => {
+    const g = String(r[gf] ?? '').trim() || '（未分組）';
+    const s = String(r[sf] ?? '').trim();
+    if (!map[g]) map[g] = [];
+    if (s && map[g].indexOf(s) < 0) map[g].push(s);
+  });
+  Object.keys(map).forEach(g => map[g].sort((a,b)=>a.localeCompare(b,'zh-TW')));
+  const groups = Object.keys(map).sort((a,b)=>a.localeCompare(b,'zh-TW')).map(g => ({ name: g, subgroups: map[g] }));
+  return { ok: true, groups, protectedCategories: activity.protectedCategories || {} };
+}
+
 
 function handleChangePassword(params) {
   if (!verifyAdminPassword(params.oldPwd)) return { ok: false, error: '舊密碼錯誤' };
