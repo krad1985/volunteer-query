@@ -253,7 +253,7 @@ function buildOverviewTable(res, opt) {
       if (si === 0) html += '<td class="ov-group" rowspan="' + span + '">' + g.name + '</td>';
       html += '<td class="text-start">' + sg.name + '</td>'
         + '<td class="num">' + sg.headcount.total + '</td>'
-        + linkCell(res, g.name, sg.name === '（未分小組）' ? '' : sg.name) + '</tr>';
+        + linkCell(res, g.name, sg.name) + '</tr>';
     });
     html += '<tr class="ov-sub' + alt + '"><td class="text-start fw-semibold">小計</td>'
       + '<td class="num fw-semibold">' + g.headcount.total + '</td>'

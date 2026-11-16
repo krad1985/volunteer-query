@@ -189,7 +189,7 @@ async function showOverview() {
       html += '<td>' + sg.name + '</td>'
         + '<td class="num">' + sg.headcount.total + '</td>'
         + '<td class="text-nowrap">'
-        + overviewLink(res, g.name, sg.name === '（未分小組）' ? '' : sg.name, '查看')
+        + overviewLink(res, g.name, sg.name, '查看')
         + '</td></tr>';
     });
     html += '<tr class="ov-sub' + alt + '"><td class="fw-semibold">小計</td>'

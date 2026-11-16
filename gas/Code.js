@@ -124,6 +124,11 @@ function handleGetActivityInfo(params) {
     subgroupsByGroupArr[g] = Object.keys(subgroupsByGroup[g]).sort((a,b)=>a.localeCompare(b,'zh-TW'));
   });
   const displayFields = (activity.displayFields && activity.displayFields.length) ? activity.displayFields : data.headers;
+  // 大組留空的資料在畫面上叫「（未分組）」，下拉選單也要有這個選項，連結才查得到
+  const groupValues = uniqueValues(rows, activity.groupField);
+  if (rows.some(r => !String(r[gf] ?? '').trim()) && groupValues.indexOf('（未分組）') < 0) {
+    groupValues.push('（未分組）');
+  }
   return {
     ok: true,
     activity: {
@@ -142,7 +147,7 @@ function handleGetActivityInfo(params) {
       accessKey: activity.accessKey || ''
     },
     headers: data.headers,
-    groupValues: uniqueValues(rows, activity.groupField),
+    groupValues: groupValues,
     subgroupValues: uniqueValues(rows, activity.subgroupField),
     subgroupsByGroup: subgroupsByGroupArr,
     recColWidths: computeRecColWidths(data.headers, rows, displayFields)
@@ -186,8 +191,14 @@ function handleGetList(params) {
   if (!data.ok) return data;
 
   let rows = data.rawRows.filter(r => !isNoiseRow(r, activity.groupField));
-  if (group) rows = rows.filter(r => String(r[activity.groupField] ?? '').trim() === group);
-  if (subgroup && subgroup !== '選擇全部') rows = rows.filter(r => String(r[activity.subgroupField] ?? '').trim() === subgroup);
+  if (group) rows = rows.filter(r => {
+    const v = String(r[activity.groupField] ?? '').trim();
+    return group === '（未分組）' ? !v : v === group;
+  });
+  if (subgroup && subgroup !== '選擇全部') rows = rows.filter(r => {
+    const v = String(r[activity.subgroupField] ?? '').trim();
+    return subgroup === '（未分小組）' ? !v : v === subgroup;
+  });
 
   // 排序：小組名稱 → 身分別（幹部 → 義工/一般義工 → 學員）→ 姓名
   const sf = activity.subgroupField, rf = activity.roleField, nf = activity.nameField;
@@ -260,8 +271,14 @@ function handleGetReport(params) {
   const filterGroup = params.group || '';
   const filterSubgroup = params.subgroup || '';
   let rows = data.rawRows.filter(r => !isNoiseRow(r, gf));
-  if (filterGroup) rows = rows.filter(r => String(r[gf] ?? '').trim() === filterGroup);
-  if (filterSubgroup) rows = rows.filter(r => String(r[sf] ?? '').trim() === filterSubgroup);
+  if (filterGroup) rows = rows.filter(r => {
+    const v = String(r[gf] ?? '').trim();
+    return filterGroup === '（未分組）' ? !v : v === filterGroup;
+  });
+  if (filterSubgroup) rows = rows.filter(r => {
+    const v = String(r[sf] ?? '').trim();
+    return filterSubgroup === '（未分小組）' ? !v : v === filterSubgroup;
+  });
 
   // 建立 group -> subgroup 結構
   const groupMap = {};
