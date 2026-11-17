@@ -88,9 +88,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnPickNone').onclick = () => setNoticePick(false);
   document.getElementById('noticeGroupFilter').addEventListener('change', renderNoticePick);
   document.getElementById('noticeCodeType').addEventListener('change', renderNoticePreview);
-  ['noticeRegion', 'noticeClassPrefix', 'noticeReportInfo', 'noticeContactName', 'noticeContactPhone', 'noticeNotices']
+  ['noticeRegion', 'noticeClassPrefix', 'noticeSerialPrefix', 'noticeReportInfo', 'noticeContactName', 'noticeContactPhone', 'noticeNotices']
     .forEach(id => document.getElementById(id).addEventListener('input', renderNoticePreview));
   document.getElementById('btnNoticePrint').onclick = printNoticeSheets;
+  document.getElementById('btnReportCollapse').onclick = toggleReportCollapse;
 });
 
 async function downloadReportImage() {
@@ -126,7 +127,8 @@ function renderAdminReport(res) {
   const opt = {
     gender: document.getElementById('reportChkGender').checked,
     role: document.getElementById('reportChkRole').checked,
-    groupSub: document.getElementById('reportChkRowSub').checked
+    groupSub: document.getElementById('reportChkRowSub').checked,
+    collapsed: !!window._reportCollapsed
   };
   const tab = document.querySelector('#reportTabs .nav-link.active')?.dataset.tab || 'manpower';
   const meta = res.dayMeta || (res.dayLabels || []).map(l => ({ label: l, attendance: true, breakfast: true, lunch: true, dinner: true, lodging: true }));
@@ -161,17 +163,22 @@ function cellHtml(col, value) {
 
 // columns: [{label, day, get(obj)}]；obj 需具備 headcount / manpowerByDay / mealsByDay / lodgingByDay / maxBed
 function buildReportTable(groups, columns, total, opt) {
+  const collapsed = !!opt.collapsed;
   let html = '<div class="report-wrap"><table class="table table-bordered table-sm report-table"><thead><tr><th>大組</th><th>小組</th>';
   columns.forEach(c => { html += '<th>' + c.label + '</th>'; });
   html += '</tr></thead><tbody>';
   groups.forEach((g, gi) => {
     const alt = gi % 2 === 1 ? ' ov-alt' : '';
-    g.subgroups.forEach(sg => {
-      html += '<tr class="ov-row' + alt + '"><td class="ov-group text-start">' + g.name + '</td><td class="text-start">' + subLabel(sg.name) + '</td>';
-      columns.forEach(c => { html += cellHtml(c, c.get(sg)); });
-      html += '</tr>';
-    });
-    if (opt.groupSub) {
+    if (!collapsed) {
+      g.subgroups.forEach((sg, si) => {
+        html += '<tr class="ov-row' + alt + '">';
+        if (si === 0) html += '<td class="ov-group text-start" rowspan="' + g.subgroups.length + '">' + g.name + '</td>';
+        html += '<td class="text-start">' + subLabel(sg.name) + '</td>';
+        columns.forEach(c => { html += cellHtml(c, c.get(sg)); });
+        html += '</tr>';
+      });
+    }
+    if (opt.groupSub || collapsed) {
       html += '<tr class="ov-sub"><td class="ov-group text-start fw-semibold">' + g.name + '</td><td class="text-start fw-semibold">小計</td>';
       columns.forEach(c => { html += cellHtml(c, c.get(g)); });
       html += '</tr>';
@@ -181,6 +188,13 @@ function buildReportTable(groups, columns, total, opt) {
   columns.forEach(c => { html += cellHtml(c, c.get(total)); });
   html += '</tr></tbody></table></div>';
   return html;
+}
+
+function toggleReportCollapse() {
+  window._reportCollapsed = !window._reportCollapsed;
+  const btn = document.getElementById('btnReportCollapse');
+  if (btn) btn.textContent = window._reportCollapsed ? '展開（含小組明細）' : '收合（只顯示大組）';
+  if (window._lastAdminReport) renderAdminReport(window._lastAdminReport);
 }
 
 function buildManpowerTable(res, meta, opt) {
@@ -487,6 +501,7 @@ function openModal(actId = null) {
 
         setDropdown('mapName', act.nameField);
         setDropdown('mapPhone', act.phoneField);
+        setDropdown('mapNum', act.numField);
         // display fields
         renderDisplayFields(act.displayFields || []);
       });
@@ -512,7 +527,7 @@ async function handleTestConnection(silent = false) {
   document.getElementById('fieldMapping').classList.remove('d-none');
   // populate dropdowns
   const opts = '<option value="">（請選擇）</option>' + availableFields.map(f => `<option value="${f}">${f}</option>`).join('');
-  ['mapGroup','mapSubgroup','mapRole','mapGender','mapName','mapPhone'].forEach(id => {
+  ['mapGroup','mapSubgroup','mapRole','mapGender','mapName','mapPhone','mapNum'].forEach(id => {
     document.getElementById(id).innerHTML = opts;
   });
   renderDisplayFields([]);
@@ -571,6 +586,7 @@ async function handleSaveActivity() {
   const birthYearField = '';
   const nameField = document.getElementById('mapName').value;
   const phoneField = document.getElementById('mapPhone').value;
+  const numField = document.getElementById('mapNum').value;
   const accessKey = document.getElementById('actAccessKey').value.trim();
   let dayMappings = [];
   try { dayMappings = JSON.parse(document.getElementById('dayMappingsJson').value || '[]'); } catch(e) { alert('日期 JSON 格式錯誤'); return; }
@@ -579,7 +595,7 @@ async function handleSaveActivity() {
   const data = {
     id: document.getElementById('editActivityId').value || undefined,
     name, sheetId, sheetUrl, sheetName: sheetName || undefined, groupField, subgroupField, roleField, genderField,
-    birthYearField, nameField, phoneField, dayMappings, displayFields, accessKey,
+    birthYearField, nameField, phoneField, numField, dayMappings, displayFields, accessKey,
     themeColor: document.getElementById('actThemeColor').value || undefined,
     unit: document.getElementById('actUnit').value || undefined
   };
@@ -655,6 +671,7 @@ function readNoticeForm() {
   return {
     region: document.getElementById('noticeRegion').value.trim(),
     classPrefix: document.getElementById('noticeClassPrefix').value.trim(),
+    serialPrefix: document.getElementById('noticeSerialPrefix').value.trim(),
     reportInfo: document.getElementById('noticeReportInfo').value,
     contactName: document.getElementById('noticeContactName').value.trim(),
     contactPhone: document.getElementById('noticeContactPhone').value.trim(),
@@ -669,6 +686,7 @@ function writeNoticeForm(cfg) {
   if (!cfg) return;
   document.getElementById('noticeRegion').value = cfg.region || '';
   document.getElementById('noticeClassPrefix').value = cfg.classPrefix || '';
+  document.getElementById('noticeSerialPrefix').value = cfg.serialPrefix || '';
   document.getElementById('noticeReportInfo').value = cfg.reportInfo || '';
   document.getElementById('noticeContactName').value = cfg.contactName || '';
   document.getElementById('noticeContactPhone').value = cfg.contactPhone || '';
@@ -725,7 +743,7 @@ function noticeEsc(t) {
 }
 
 function noticeSheetHtml(cfg, p) {
-  const title = noticeData && noticeData.name ? noticeData.name + ' 義工報到通知單' : '義工報到通知單';
+  const title = noticeData && noticeData.name ? noticeData.name : '義工報到通知單';
   const meta = [];
   if (cfg.region) meta.push('<span class="meta-line"><strong>區域:</strong>' + noticeEsc(cfg.region) + '</span>');
   if (cfg.classPrefix) meta.push('<span class="meta-line"><strong>班別:</strong>' + noticeEsc(cfg.classPrefix) + '</span>');

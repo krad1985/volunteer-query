@@ -73,6 +73,8 @@ function handleListActivities(params) {
 /* ===== 活動資訊 ===== */
 function authorizeActivity(params, activity) {
   const index = getConfigIndex();
+  // 總管理員／單位管理員已驗證身分，直接放行
+  if (resolveAdminAuth(params)) return { ok: true };
   const token = params.token || '';
   const key = params.key || '';
   const unitToken = activity.unit ? (getUnitById(activity.unit)?.token || '') : '';
@@ -144,6 +146,7 @@ function handleGetActivityInfo(params) {
       birthYearField: activity.birthYearField || '',
       nameField: activity.nameField || '',
       phoneField: activity.phoneField || '',
+      numField: activity.numField || '',
       dayMappings: normalizeDayMappings(activity.dayMappings || []),
       displayFields: activity.displayFields || [],
       unit: activity.unit || '',
@@ -177,11 +180,13 @@ function handleGetList(params) {
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
 
   // 密碼驗證：若 activity 有 protectedCategories（以 group/subgroup 為 key）
+  // 管理員已驗證身分，不受組別密碼限制
+  const isAdmin = !!resolveAdminAuth(params);
   const protectedSet = activity.protectedCategories || {};
-  if (subgroup && protectedSet[subgroup] && protectedSet[subgroup] !== pwd) {
+  if (!isAdmin && subgroup && protectedSet[subgroup] && protectedSet[subgroup] !== pwd) {
     return { ok: false, code: 'NEED_PWD', error: '此小組已鎖定，需輸入正確密碼' };
   }
-  if (!subgroup && group && protectedSet[group] && protectedSet[group] !== pwd) {
+  if (!isAdmin && !subgroup && group && protectedSet[group] && protectedSet[group] !== pwd) {
     return { ok: false, code: 'NEED_PWD', error: '此大組已鎖定，需輸入正確密碼' };
   }
 
@@ -398,7 +403,10 @@ function handleGetSummary(params) {
   if (!activity) return { ok: false, error: '找不到該活動' };
   const auth = authorizeActivity(params, activity);
   if (!auth.ok) return { ok: false, code: auth.code, error: auth.error };
-
+  const adminAuth = resolveAdminAuth(params);
+  if (adminAuth && adminAuth.role === 'unit' && activity.unit !== adminAuth.unit.id) {
+    return { ok: false, error: '不可查看其他單位的活動' };
+  }
   const cacheKey = CACHE_PREFIX + 'SUM_' + actId + '_v' + (activity.cacheVersion || 0);
   const cache = CacheService.getScriptCache();
   const cached = cache.get(cacheKey);
@@ -482,18 +490,22 @@ function handleGetNoticeData(params) {
   rows = sortRosterRows(rows, sf, rf, nf);
 
   const nc = Object.assign({
-    region: '', classPrefix: '', reportInfo: '', notices: [],
+    region: '', classPrefix: '', serialPrefix: '', reportInfo: '', notices: [],
     contactName: '', contactPhone: '', serialStart: 1, serialDigits: 3,
     showBarcode: true, showQr: true
   }, activity.noticeConfig || {});
 
   const digits = Math.max(1, Math.min(6, Number(nc.serialDigits) || 3));
   const start = Number(nc.serialStart) || 1;
-  const numField = data.headers.filter(h => h === '編號')[0] || data.headers.filter(h => String(h).includes('編號'))[0] || '';
+  // 編號欄位：優先使用管理者指定的欄位，其次才是自動偵測
+  const autoNumField = data.headers.filter(h => h === '編號')[0]
+    || data.headers.filter(h => String(h).includes('編號'))[0] || '';
+  const numField = (activity.numField && data.headers.indexOf(activity.numField) >= 0)
+    ? activity.numField : autoNumField;
 
   const people = rows.map((r, i) => {
     const rawNum = numField ? String(r[numField] ?? '').trim() : '';
-    const autoCode = String(nc.classPrefix || '') + String(start + i).padStart(digits, '0');
+    const autoCode = String(nc.serialPrefix || '') + String(start + i).padStart(digits, '0');
     return {
       name: String(r[nf] ?? '').trim(),
       group: String(r[gf] ?? '').trim() || '（未分組）',

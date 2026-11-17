@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>管理後台</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=20261117d">
+  <link rel="stylesheet" href="css/style.css?v=20261117e">
 </head>
 <body class="bg-light">
   <div class="container py-4">
@@ -87,6 +87,7 @@
               <div class="form-check"><input class="form-check-input" type="checkbox" id="reportChkRowSub"><label class="form-check-label" for="reportChkRowSub">顯示大組小計</label></div>
             </div>
             <div class="col-md-2"><button id="reportLoadBtn" class="btn btn-primary">載入報表</button></div>
+            <div class="col-md-2"><button id="btnReportCollapse" class="btn btn-outline-secondary">收合（只顯示大組）</button></div>
             <div class="col-md-2"><button id="reportImgBtn" class="btn btn-outline-secondary">下載表格圖片</button></div>
           </div>
           <ul class="nav nav-tabs" id="reportTabs">
@@ -155,6 +156,10 @@
               <div class="col-md-3">
                 <label class="form-label">班別（編號前綴）</label>
                 <input type="text" id="noticeClassPrefix" class="form-control" placeholder="例如：嘉16宗">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">流水號前綴（選填）</label>
+                <input type="text" id="noticeSerialPrefix" class="form-control" placeholder="例如：TMP">
               </div>
               <div class="col-md-3">
                 <label class="form-label">流水號起始</label>
@@ -241,6 +246,7 @@
               <div class="col-md-4"><label>性別欄位</label><select id="mapGender" class="form-select"></select></div>
               <div class="col-md-4"><label>姓名欄位</label><select id="mapName" class="form-select"></select></div>
               <div class="col-md-4"><label>電話欄位</label><select id="mapPhone" class="form-select"></select></div>
+              <div class="col-md-4"><label>編號欄位（選填）</label><select id="mapNum" class="form-select"></select></div>
             </div>
 
             <h5 class="mt-3">日期 / 餐宿欄位對應（JSON）</h5>
@@ -338,9 +344,9 @@
       letter-spacing: 1px;
     }
     .notice-block.plain { background: transparent; }
-    .notice-meta { font-size: 10pt; }
-    .notice-meta .meta-line { margin-bottom: 2px; }
-    .notice-meta .meta-line strong { font-weight: 700; }
+    .notice-meta { font-size: 10pt; display: flex; flex-wrap: wrap; gap: 2px 18px; align-items: baseline; }
+    .notice-meta .meta-line { margin-bottom: 0; white-space: nowrap; }
+    .notice-meta .meta-line strong { font-weight: 700; margin-right: 5px; }
     .notice-ol { padding-left: 20px; margin: 2px 0; }
     .notice-ol li { margin-bottom: 2px; }
     .notice-contact { margin-top: 6px; text-align: right; font-weight: 700; }
@@ -357,8 +363,8 @@
     }
   </style>
 
-  <script src="js/config.js?v=20261117d"></script>
-  <script src="js/admin.js?v=20261117d"></script>
+  <script src="js/config.js?v=20261117e"></script>
+  <script src="js/admin.js?v=20261117e"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </body>
