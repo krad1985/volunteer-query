@@ -785,13 +785,25 @@ function noticeSheetHtml(cfg, p) {
     + '</div>';
 }
 
+// 依表單重算編號（流水號前綴／起始／位數），有來源編號欄者沿用來源值
+function applyNoticeCodes(list, cfg) {
+  const digits = Math.max(1, Math.min(6, Number(cfg.serialDigits) || 3));
+  const start = Number(cfg.serialStart) || 1;
+  return list.map((p, i) => {
+    if (p.fromSheet) return p;
+    const auto = String(cfg.serialPrefix || '') + String(start + i).padStart(digits, '0');
+    return Object.assign({}, p, { code: auto, autoCode: auto });
+  });
+}
+
 function renderNoticePreview() {
   const box = document.getElementById('noticePreview');
   if (!box || !noticeData) return;
   const cfg = readNoticeForm();
   const checked = Array.from(document.querySelectorAll('.notice-pick:checked'))
     .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
-  const people = checked.length ? checked.slice(0, 1) : noticePeople.slice(0, 1);
+  const base = checked.length ? checked.slice(0, 1) : noticePeople.slice(0, 1);
+  const people = applyNoticeCodes(base, cfg);
   box.innerHTML = people.map(p => noticeSheetHtml(cfg, p)).join('');
 }
 
@@ -831,7 +843,8 @@ function printNoticeSheets() {
     .map(cb => noticePeople[Number(cb.dataset.idx)]).filter(Boolean);
   if (!checked.length) { alert('請至少勾選一人'); return; }
   const cfg = readNoticeForm();
-  const sheets = checked.map(p => noticeSheetHtml(cfg, p)).join('');
+  const people = applyNoticeCodes(checked, cfg);
+  const sheets = people.map(p => noticeSheetHtml(cfg, p)).join('');
   const css = (document.getElementById('noticeStyle') || {}).textContent || '';
   const win = window.open('', '_blank');
   win.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>通知單</title>'
