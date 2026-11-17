@@ -51,12 +51,10 @@ function hideLoading() {
 }
 
 function api(action, params = {}) {
-  _loadingStart = Date.now();
-  showLoading();
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
-  return fetch(url).then(r => r.json()).finally(hideLoading);
+  return fetch(url).then(r => r.json());
 }
 function authParams() {
   const p = new URLSearchParams(location.search);
@@ -261,7 +259,14 @@ async function submitQuery() {
   const role = document.getElementById('roleSelect').value;
   const gender = document.getElementById('genderSelect').value;
   const search = document.getElementById('searchInput').value;
-  const res = await api('getList', { act: actId, group, subgroup, pwd: password, ...authParams() });
+  _loadingStart = Date.now();
+  showLoading('正在載入名單…');
+  let res;
+  try {
+    res = await api('getList', { act: actId, group, subgroup, pwd: password, ...authParams() });
+  } finally {
+    hideLoading();
+  }
   if (!res.ok) { showError(res.error || '查詢失敗'); document.getElementById('results').classList.add('d-none'); return; }
   let rows = res.rows || [];
   allRows = rows.slice();

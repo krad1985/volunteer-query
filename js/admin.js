@@ -53,19 +53,17 @@ function hideLoading() {
 }
 
 function api(action, params = {}) {
-  _loadingStart = Date.now();
-  showLoading();
   // 大型資料（如活動設定）改用 POST，避免 GET URL 長度限制
   if (params.data) {
     const body = new URLSearchParams();
     body.set('action', action);
     Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') body.set(k, v); });
-    return fetch(CONFIG.GAS_URL, { method: 'POST', body }).then(r => r.json()).finally(hideLoading);
+    return fetch(CONFIG.GAS_URL, { method: 'POST', body }).then(r => r.json());
   }
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
-  return fetch(url).then(r => r.json()).finally(hideLoading);
+  return fetch(url).then(r => r.json());
 }
 function authParams() {
   if (loginRole === 'unit' && currentUnit) return { unit: currentUnit.id, unitPwd: adminPassword };
@@ -747,7 +745,14 @@ function writeNoticeForm(cfg) {
 async function loadNoticeConfig() {
   const actId = document.getElementById('noticeActivitySelect').value;
   if (!actId) { alert('請選擇活動'); return; }
-  const res = await api('getNoticeData', { act: actId, ...authParams() });
+  _loadingStart = Date.now();
+  showLoading('正在載入名單…');
+  let res;
+  try {
+    res = await api('getNoticeData', { act: actId, ...authParams() });
+  } finally {
+    hideLoading();
+  }
   if (!res.ok) { alert(res.error || '載入失敗'); return; }
   noticeData = res;
   noticePeople = res.people || [];
