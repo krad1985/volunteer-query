@@ -365,13 +365,13 @@ function renderStats(rows) {
 function exportCsv() {
   const fields = currentFields; const rows = currentRows;
   if (!rows || rows.length === 0) { alert('目前沒有可匯出的資料'); return; }
-  const esc = v => { const s = v == null ? '' : String(v); return /[",\\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const esc = v => { const s = v == null ? '' : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const actName = currentActivity?.name || '名冊';
   const now = new Date().toLocaleString('zh-TW', { hour12: false });
   const lines = [];
   lines.push(fields.map(esc).join(','));
   rows.forEach(r => lines.push(r.map(esc).join(',')));
-  const csv = '\\uFEFF' + lines.join('\\r\\n');
+  const csv = '\uFEFF' + lines.join('\r\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
