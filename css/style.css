@@ -88,6 +88,12 @@ a.ov-link:hover, button.ov-link:hover { background: #eff6ff; text-decoration: un
 
 .notice-pick-item { border-bottom: 1px solid #eee; padding: 2px 0; }
 .notice-pick-item label { display: flex; gap: 8px; align-items: baseline; }
+@media print {
+  body > *:not(#printArea) { display: none !important; }
+  #printArea { display: block !important; }
+  body { background: #fff !important; padding: 0 !important; }
+}
+#printArea { display: none; }
 .report-wrap { overflow-x: auto; display: block; }
 
 /* ===== 載入進度條＋跑馬燈 ===== */

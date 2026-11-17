@@ -964,8 +964,16 @@ function readSpreadsheetData(activity) {
     const lastCol = sheet.getLastColumn();
     const headers = sheet.getRange(1,1,1,lastCol).getValues()[0].map(h=>String(h).trim());
     const data = sheet.getRange(2,1,lastRow-1,lastCol).getValues();
+    const nf = activity.nameField, gf = activity.groupField, sf = activity.subgroupField;
+    // 整列沒有任何內容，或姓名／大組／小組全部空白（只有其他非人員欄位有值）→ 視為噪音資料，不列入名單與統計
     const rawRows = data.filter(row => row.some(c => String(c).trim() !== ''))
-      .map(row => { const obj = {}; headers.forEach((h,i) => { obj[h] = row[i]; }); return obj; });
+      .map(row => { const obj = {}; headers.forEach((h,i) => { obj[h] = row[i]; }); return obj; })
+      .filter(obj => {
+        const n = nf ? String(obj[nf] ?? '').trim() : '';
+        const g = gf ? String(obj[gf] ?? '').trim() : '';
+        const s = sf ? String(obj[sf] ?? '').trim() : '';
+        return n !== '' || g !== '' || s !== '';
+      });
     return { ok: true, headers, rawRows };
   } catch (err) { return { ok: false, error: err.toString() }; }
 }
