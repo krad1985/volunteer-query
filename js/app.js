@@ -440,6 +440,7 @@ function printRoster() {
   const now = new Date().toLocaleString('zh-TW', { hour12: false });
   const thead = '<thead><tr>' + fields.map(f => `<th>${escHtml(f)}</th>`).join('') + '</tr></thead>';
   // 以資料內容判斷 0/1 欄位（與畫面顯示一致），不要靠欄名猜
+  const ynMap = { '是': '☑', '否': '☐', '有': '☑', '無': '☐', 'Y': '☑', 'N': '☐', '1': '☑', '0': '☐' };
   const boolCols = new Set();
   fields.forEach((f, i) => {
     if (/電話|姓名|性別|身分別|大組|小組/.test(f)) return;
@@ -448,19 +449,15 @@ function printRoster() {
       const v = String(row[i] ?? '').trim();
       if (v === '') continue;
       has = true;
-      if (v !== '0' && v !== '1') { allBool = false; break; }
+      if (!ynMap[v]) { allBool = false; break; }
     }
     if (has && allBool) boolCols.add(i);
   });
-
-  const ynMap = { '是': '☑', '否': '☐', '有': '☑', '無': '☐', 'Y': '☑', 'N': '☐' };
   const tbody = '<tbody>' + rows.map(r => '<tr>' + r.map((c, i) => {
     const raw = String(c ?? '').trim();
     let val = c ?? '';
     if (boolCols.has(i)) {
-      val = raw === '1' ? '☑' : (raw === '0' ? '☐' : raw);
-    } else if (ynMap[raw]) {
-      val = ynMap[raw];
+      val = ynMap[raw] || raw;
     }
     return `<td>${escHtml(val)}</td>`;
   }).join('') + '</tr>').join('') + '</tbody>';
