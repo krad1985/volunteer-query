@@ -7,18 +7,65 @@ let loginRole = 'admin';
 let currentUnit = null;
 let units = [];
 
+/* ===== 載入進度條＋跑馬燈 ===== */
+const LOADING_LINES = [
+  '正在跟試算表對話中…',
+  '願力傳輸中，請稍候…',
+  '一排一排點名中…',
+  '慈悲心正在載入…',
+  '資料剛睡醒，正在集合…',
+  '善願連線中…',
+  '以利他心整理名單…',
+  '一分耕耘，一分資料…',
+  '值班菩薩正在催資料…',
+  '船筏正在渡河，資料快到了…'
+];
+let _loadingCount = 0;
+let _loadingTimer = null;
+let _loadingStart = 0;
+
+function showLoading(text) {
+  _loadingCount++;
+  const bar = document.getElementById('loadingBar');
+  if (!bar) return;
+  bar.classList.remove('d-none');
+  const el = document.getElementById('loadingMsgText');
+  if (el && text) el.textContent = text;
+  if (_loadingTimer) clearInterval(_loadingTimer);
+  let i = 0;
+  _loadingTimer = setInterval(() => {
+    i = (i + 1) % LOADING_LINES.length;
+    const e = document.getElementById('loadingMsgText');
+    if (e) e.textContent = LOADING_LINES[i];
+  }, 2200);
+}
+
+function hideLoading() {
+  _loadingCount = Math.max(0, _loadingCount - 1);
+  if (_loadingCount > 0) return;
+  const remain = 350 - (Date.now() - _loadingStart);
+  const done = () => {
+    const bar = document.getElementById('loadingBar');
+    if (bar) bar.classList.add('d-none');
+    if (_loadingTimer) { clearInterval(_loadingTimer); _loadingTimer = null; }
+  };
+  if (remain > 0) setTimeout(done, remain); else done();
+}
+
 function api(action, params = {}) {
+  _loadingStart = Date.now();
+  showLoading();
   // 大型資料（如活動設定）改用 POST，避免 GET URL 長度限制
   if (params.data) {
     const body = new URLSearchParams();
     body.set('action', action);
     Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') body.set(k, v); });
-    return fetch(CONFIG.GAS_URL, { method: 'POST', body }).then(r => r.json());
+    return fetch(CONFIG.GAS_URL, { method: 'POST', body }).then(r => r.json()).finally(hideLoading);
   }
   const url = new URL(CONFIG.GAS_URL);
   url.searchParams.set('action', action);
   Object.entries(params).forEach(([k,v]) => { if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v); });
-  return fetch(url).then(r => r.json());
+  return fetch(url).then(r => r.json()).finally(hideLoading);
 }
 function authParams() {
   if (loginRole === 'unit' && currentUnit) return { unit: currentUnit.id, unitPwd: adminPassword };

@@ -51,8 +51,7 @@ table.report-table tbody tr.ov-total td {
   color: #fff;
   font-weight: 600;
 }
-table.report-table tbody tr.ov-total td.num { font-variant-numeric: tabular-nums; }
-table.report-table tbody tr:hover td:not(.ov-group) { background: #e8f0fb; }
+table.report-table tbody tr.ov-total td.num { font-variant-numeric: tabular-nums; }table.report-table tbody tr:hover td:not(.ov-group) { background: #e8f0fb; }
 a.ov-link, button.ov-link {
   display: inline-block;
   padding: 1px 6px;
@@ -90,3 +89,29 @@ a.ov-link:hover, button.ov-link:hover { background: #eff6ff; text-decoration: un
 .notice-pick-item { border-bottom: 1px solid #eee; padding: 2px 0; }
 .notice-pick-item label { display: flex; gap: 8px; align-items: baseline; }
 .report-wrap { overflow-x: auto; display: block; }
+
+/* ===== 載入進度條＋跑馬燈 ===== */
+.loading-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: #fff; border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(15,23,42,.08);
+  padding: 8px 16px 10px;
+}
+.loading-track { height: 6px; background: #eef2f7; border-radius: 999px; overflow: hidden; }
+.loading-fill {
+  height: 100%; width: 40%; border-radius: 999px;
+  background: var(--ov-accent, #3b5b8c);
+  animation: loading-slide 1.15s ease-in-out infinite;
+}
+@keyframes loading-slide {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+.loading-msg { margin-top: 6px; font-size: .82rem; color: #475569; text-align: center; min-height: 1.2em; }
+.loading-msg span { display: inline-block; animation: loading-fade 2.2s ease-in-out infinite; }
+@keyframes loading-fade {
+  0% { opacity: 0; transform: translateY(5px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-5px); }
+}
